@@ -6,7 +6,7 @@
 // @include        http://www.reddit.com/r/*/about/spam*
 // @include        http://www.reddit.com/r/*/about/reports*
 // @license        GPL
-// @version        2.2
+// @version        3.0.0
 // ==/UserScript==
 
 if(!/^http:\/\/www\.reddit\.com\/r\/[0-9a-z_]+\/about\/(spam|modqueue|reports)[\/.?#]?.*$/i.exec(document.location)) {
@@ -115,8 +115,27 @@ var srFilter = reddit.post_site || null;
  *======*
  Data store manipulation. */
 
-const cookieStore = 'autoban';
-const storeVersion = 2; // must match script major version!
+const storeKey = 'autoban';
+const storeVersion = 3; // must match script major version!
+
+function setLegacyStores() {
+   $.cookie(storeKey, $.toJSON({version:storeVersion, msg:"We use HTML5 WebStorage as of v3, instead of cookies."}), {expires: 1000, path: '/', domain:'.reddit.com'});
+}
+
+function detectLegacyStore() {
+   var cookie, store;
+   if((cookie = $.cookie(storeKey)) && (store = $.secureEvalJSON(cookie)) && isNaturalNumber(store.version)) { // valid cookie
+      if(store.version > 2) { // forwarding cookie -- 2 was the last version to use cookies
+         return;
+      }
+      upgradeStore(store);
+      if(uneval(makeEmptyStore()) != uneval(getStore())) { // Don't overwrite non-empty modern store!
+         fail("You have both a cookie and a WebStorage version of autoban! Aborting upgrade.");
+      }
+      setStore(store);
+   }
+   setLegacyStores(); // no legacy data, so leave a forwarding address
+}
 
 function makeEmptyStore() {
    return {'version':storeVersion, // Datastore compatibility version (matches script major version)
@@ -140,12 +159,14 @@ function upgradeStore(store) {
    case 1:
       store.version = 2;
       store.sitewide = {};
+   case 2:
+      store.version = 3;
    }
 }
 
 function getStore() {
-   var cookie, store;
-   if(!(cookie = $.cookie(cookieStore)) || !(store = $.secureEvalJSON(cookie))) {
+   var value, store;
+   if(!(value = localStorage.getItem(storeKey)) || !(store = $.secureEvalJSON(value))) {
       store = makeEmptyStore();
    }
    if(store.version != storeVersion) {
@@ -155,7 +176,7 @@ function getStore() {
 }
 
 function setStore(store) {
-   $.cookie(cookieStore, $.toJSON(store), {expires: 1000, path: '/', domain:'.reddit.com'});
+   localStorage.setItem(storeKey, $.toJSON(store));
 }
 
 /*=====*
@@ -240,6 +261,8 @@ function isBanned(store, uname, sr) {
  * GUI *
  *=====*
  Modify the DOM. */
+
+var $killspinner = $('<img class="killspinner" src="data:image/gif;base64,R0lGODlhEAAQAPEAAP%2F%2F%2FwAAADY2NgAAACH%2FC05FVFNDQVBFMi4wAwEAAAAh%2FhpDcmVhdGVkIHdpdGggYWpheGxvYWQuaW5mbwAh%2BQQJCgAAACwAAAAAEAAQAAACLYSPacLtvkA7U64qGb2C6gtyXmeJHIl%2BWYeuY7SSLozV6WvK9pfqWv8IKoaIAgAh%2BQQJCgAAACwAAAAAEAAQAAACLYSPacLtvhY7DYhY5bV62xl9XvZJFCiGaReS1Xa5ICyP2jnS%2BM7drPgIKoaIAgAh%2BQQJCgAAACwAAAAAEAAQAAACLISPacLtvk6TE4jF6L3WZsyFlcd1pEZhKBixYOie8FiJ39nS97f39gNUCBEFACH5BAkKAAAALAAAAAAQABAAAAIshI9pwu2%2BxGmTrSqjBZlqfnnc1onmh44RxoIp5JpWN2b1Vdvn%2FZbPb1MIAQUAIfkECQoAAAAsAAAAABAAEAAAAi2Ej2nC7b7YaVPEamPOgOqtYd3SSeFYmul0rlcpnpyXgu4K0t6mq%2FwD5CiGgAIAIfkECQoAAAAsAAAAABAAEAAAAiyEj2nC7b7akSuKyXDE11ZvdWLmiQB1kiOZdifYailHvzBko5Kpq%2BHzUAgRBQA7AAAAAAAAAAAA"/>');
 
 var $banlist;
 
@@ -485,8 +508,8 @@ $('head').append('<style type="text/css"> \
                      body > .gmerror { color: red; border: 1px solid red; padding: .25em; font-size: 15px; } \
                   </style>');
 
-var $killspinner = $('<img class="killspinner" src="data:image/gif;base64,R0lGODlhEAAQAPEAAP%2F%2F%2FwAAADY2NgAAACH%2FC05FVFNDQVBFMi4wAwEAAAAh%2FhpDcmVhdGVkIHdpdGggYWpheGxvYWQuaW5mbwAh%2BQQJCgAAACwAAAAAEAAQAAACLYSPacLtvkA7U64qGb2C6gtyXmeJHIl%2BWYeuY7SSLozV6WvK9pfqWv8IKoaIAgAh%2BQQJCgAAACwAAAAAEAAQAAACLYSPacLtvhY7DYhY5bV62xl9XvZJFCiGaReS1Xa5ICyP2jnS%2BM7drPgIKoaIAgAh%2BQQJCgAAACwAAAAAEAAQAAACLISPacLtvk6TE4jF6L3WZsyFlcd1pEZhKBixYOie8FiJ39nS97f39gNUCBEFACH5BAkKAAAALAAAAAAQABAAAAIshI9pwu2%2BxGmTrSqjBZlqfnnc1onmh44RxoIp5JpWN2b1Vdvn%2FZbPb1MIAQUAIfkECQoAAAAsAAAAABAAEAAAAi2Ej2nC7b7YaVPEamPOgOqtYd3SSeFYmul0rlcpnpyXgu4K0t6mq%2FwD5CiGgAIAIfkECQoAAAAsAAAAABAAEAAAAiyEj2nC7b7akSuKyXDE11ZvdWLmiQB1kiOZdifYailHvzBko5Kpq%2BHzUAgRBQA7AAAAAAAAAAAA"/>');
-var initStore = getStore();
+detectLegacyStore();
 makeBanListing();
+var initStore = getStore();
 showCurrentBans(initStore);
 scanAndNuke(initStore, innervateRemaining);
