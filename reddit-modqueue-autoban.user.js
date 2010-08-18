@@ -2,10 +2,16 @@
 // @name           Reddit: Modqueue autoban
 // @namespace      tag:brainonfire.net,2010-07-31:reddit-modqueue-autoban
 // @description    Allow a moderator to set a spammer as "autobanned". The script will then automatically confirm removal of all of their posts in the modqueue (upon every load) and hide these entries. The sidebar will be modified to contain a list of these users, and will allow their removal from the list.
-// @include        http://www.reddit.com/r/mod/about/modqueue*
+// @include        http://www.reddit.com/r/*/about/modqueue*
+// @include        http://www.reddit.com/r/*/about/spam*
+// @include        http://www.reddit.com/r/*/about/reports*
 // @license        GPL
-// @version        1.0
+// @version        1.1
 // ==/UserScript==
+
+if(!/^http:\/\/www\.reddit\.com\/r\/[0-9a-z_]+\/about\/(spam|modqueue|reports)[\/.?#]?.*$/gi.exec(document.location)) {
+   return;
+}
 
 /** Run entire script inside page. From http://wiki.greasespot.net/Content_Scope_Runner */
 if(typeof __PAGE_SCOPE_RUN__ == 'undefined') {
@@ -91,6 +97,12 @@ jQuery.cookie = function(name, value, options) {
     }
 };
 
+/*========*
+ * CONFIG *
+ *========*/
+
+var srFilter = reddit.post_site || null;
+
 /*======*
  * DATA *
  *======*/
@@ -156,7 +168,7 @@ function unbanUser(sr, uname) {
 
 function doAutoban(item, ev) {
    var user = $('.author', item).text();
-   var sr = $('.subreddit', item).text();
+   var sr = srFilter || $('.subreddit', item).text();
    if(!window.confirm('Autoban user '+user+' from '+sr+'?'))
       return;
    banUser(sr, user);
@@ -185,6 +197,11 @@ function makeBanListing(directory) {
    $banlist = $('<div class="spacer"><div class="sidecontentbox autobanlist"><h1><a href="http://userscripts.org/scripts/show/82709">Autoban list</a></h1><div class="content"><ul></ul></div></div></div>')
       .insertAfter('body > .side > .spacer:first')
       .find('ul');
+   if(srFilter) {
+      var smaller = {};
+      smaller[srFilter] = directory[srFilter];
+      directory = smaller;
+   }
    for(var sr in directory) {
       var userlist = directory[sr];
       for(var unameDex in userlist) {
@@ -211,7 +228,7 @@ function addToBanListing(sr, uname, listing) {
 function judgeItem(item, k, directory) {
    var pause = 0;
    var user = $(item).find('.author').eq(0).text();
-   var subreddit = $(item).find('.subreddit').eq(0).text();
+   var subreddit = srFilter || $(item).find('.subreddit').eq(0).text();
    if(directory[subreddit] && directory[subreddit].indexOf(user) != -1) {
       $('.big-mod-buttons .negative', item).click();
       $(item).add($(item).next('.clearleft')).remove();
