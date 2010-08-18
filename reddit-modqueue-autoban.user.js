@@ -6,7 +6,7 @@
 // @include        http://www.reddit.com/r/*/about/spam*
 // @include        http://www.reddit.com/r/*/about/reports*
 // @license        GPL
-// @version        2.1
+// @version        2.1.1
 // ==/UserScript==
 
 if(!/^http:\/\/www\.reddit\.com\/r\/[0-9a-z_]+\/about\/(spam|modqueue|reports)[\/.?#]?.*$/i.exec(document.location)) {
@@ -356,7 +356,7 @@ function askedAutoban(item) {
       return;
 
    var store = getStore();
-   banUser(sr, user);
+   banUser(store, sr, user);
    setStore(store);
    
    showCurrentBans(store);
