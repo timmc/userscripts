@@ -6,7 +6,7 @@
 // @include        http://www.reddit.com/r/*/about/spam*
 // @include        http://www.reddit.com/r/*/about/reports*
 // @license        GPL
-// @version        3.1.0
+// @version        3.1.1
 // ==/UserScript==
 
 if(!/^http:\/\/www\.reddit\.com\/r\/[0-9a-z_]+\/about\/(spam|modqueue|reports)[\/.?#]?.*$/i.exec(document.location)) {
@@ -118,6 +118,27 @@ var srFilter = reddit.post_site || null;
 const storeKey = 'autoban';
 const storeVersion = 3; // must match script major version!
 
+function testWebStorage() {
+   var testKey = 'miuwaeikcuhkiwe';
+   var testValue = '5abc';
+   var e;
+   try {
+      window.localStorage; // even retrieving it throws an error if it is disabled
+   } catch(e) {
+      fail("Please re-enable HTML5 WebStorage (sometimes called DOMStorage) in your browser.");
+   }
+   if(!localStorage)
+      fail("Your browser does not support HTML5 WebStorage! Downgrade to script v2 or upgrade your browser.");
+   try {
+      localStorage.setItem(testKey, testValue);
+   } catch(e) {
+      fail("HTML5 WebStorage full or forbidden.");
+   }
+   if(localStorage.getItem(testKey) !== testValue)
+      fail("Failure during HTML5 WebStorage test.");
+   localStorage.removeItem(testKey);
+}
+
 function setLegacyStores() {
    $.cookie(storeKey, $.toJSON({version:storeVersion, msg:"We use HTML5 WebStorage as of v3, instead of cookies."}), {expires: 1000, path: '/', domain:'.reddit.com'});
 }
@@ -128,20 +149,15 @@ function detectLegacyStore() {
       if(store.version > 2) { // forwarding cookie -- 2 was the last version to use cookies
          return;
       }
-      upgradeStore(store);
+      testWebStorage();
       if(uneval(makeEmptyStore()) != uneval(getStore())) { // Don't overwrite non-empty modern store!
          fail("You have both a cookie and a WebStorage version of autoban! Aborting upgrade.");
       }
+      warn("Upgrading from cookie to HTML5 WebStorage. Just in case your browser fails at WebStorage, keep your data safe for at least one browser restart:", $.toJSON(store));
+      upgradeStore(store);
       setStore(store);
    }
    setLegacyStores(); // no legacy data, so leave a forwarding address
-}
-
-function makeEmptyStore() {
-   return {'version':storeVersion, // Datastore compatibility version (matches script major version)
-           'byreddit':{}, // hash of subreddits to username arrays (banned within subreddit)
-           'sitewide':{} // hash of usernames to subreddit name arrays (banned globally, was local to those subreddits)
-   };
 }
 
 /** Perform in-place upgrade of store. */
@@ -162,6 +178,17 @@ function upgradeStore(store) {
    case 2:
       store.version = 3;
    }
+}
+
+/*==========*
+ * DATA API *
+ *==========*/
+
+function makeEmptyStore() {
+   return {'version':storeVersion, // Datastore compatibility version (matches script major version)
+           'byreddit':{}, // hash of subreddits to username arrays (banned within subreddit)
+           'sitewide':{} // hash of usernames to subreddit name arrays (banned globally, was local to those subreddits)
+   };
 }
 
 function getStore() {
@@ -337,6 +364,13 @@ function fail(msg) {
    throw msg;
 }
 
+function warn(msg, raw) {
+   var $warn = $('<div class="gmwarn"></div>').text("autoban script warning: "+msg).prependTo('body');
+   if(raw) {
+      $("<pre></pre>").text(raw).appendTo($warn);
+   }
+}
+
 /*======*
  * CORE *
  *======*/
@@ -507,6 +541,8 @@ $('head').append('<style type="text/css"> \
                      #siteTable .doomed .autoban { display: none; } \
                      #siteTable img.killspinner { float: right; } \
                      body > .gmerror { color: red; border: 1px solid red; padding: .25em; font-size: 15px; } \
+                     body > .gmwarn { background-color: black; color: yellow; border: 2px solid yellow; padding: .25em; font-size: 15px; } \
+                     body > .gmwarn pre { border: 1px solid yellow; overflow: auto; font-size: medium; padding: .4em; margin: .5em; } \
                   </style>');
 
 detectLegacyStore();
