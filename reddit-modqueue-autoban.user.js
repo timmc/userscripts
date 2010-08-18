@@ -6,7 +6,7 @@
 // @include        http://www.reddit.com/r/*/about/spam*
 // @include        http://www.reddit.com/r/*/about/reports*
 // @license        GPL
-// @version        1.1
+// @version        1.2
 // ==/UserScript==
 
 if(!/^http:\/\/www\.reddit\.com\/r\/[0-9a-z_]+\/about\/(spam|modqueue|reports)[\/.?#]?.*$/gi.exec(document.location)) {
@@ -232,7 +232,7 @@ function judgeItem(item, k, directory) {
    if(directory[subreddit] && directory[subreddit].indexOf(user) != -1) {
       $('.big-mod-buttons .negative', item).click();
       $(item).add($(item).next('.clearleft')).remove();
-      pause = 200; // give the removal time to run
+      pause = 2000; // give the removal time to run
    }
    setTimeout(partial(k, directory), pause);
 }
