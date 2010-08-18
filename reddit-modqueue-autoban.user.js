@@ -6,7 +6,7 @@
 // @include        http://www.reddit.com/r/*/about/spam*
 // @include        http://www.reddit.com/r/*/about/reports*
 // @license        GPL
-// @version        1.2
+// @version        1.3
 // ==/UserScript==
 
 if(!/^http:\/\/www\.reddit\.com\/r\/[0-9a-z_]+\/about\/(spam|modqueue|reports)[\/.?#]?.*$/gi.exec(document.location)) {
@@ -194,7 +194,28 @@ function doUnban(sr, username, ev) {
 var $banlist;
 
 function makeBanListing(directory) {
-   $banlist = $('<div class="spacer"><div class="sidecontentbox autobanlist"><h1><a href="http://userscripts.org/scripts/show/82709">Autoban list</a></h1><div class="content"><ul></ul></div></div></div>')
+   $('head').append('<style type="text/css"> \
+                        .autobanlist { position: relative; } \
+                        .autobanlist a.expand { position: absolute; top: -2px; right: 0; } \
+                        .autobanlist u.listing { padding-left: 1em; text-indent: -1em; line-height: 1.5; font-size: .9em; } \
+                     </style>');
+   $banlist = $('<div class="spacer"> \
+                    <div class="sidecontentbox autobanlist thing"> \
+                       <h1> \
+                          <a href="http://userscripts.org/scripts/show/82709">Autoban list</a> \
+                       </h1> \
+                       <div class="content entry"> \
+                          <div class="collapsed"> \
+                             <a class="expand" onclick="return showcomment(this)" href="#">[+]</a> \
+                             (collapsed) \
+                          </div> \
+                          <div class="noncollapsed" style="display:none"> \
+                             <a class="expand" onclick="return hidecomment(this)" href="#">[-]</a> \
+                             <ul class="listing"></ul> \
+                          </div> \
+                       </div> \
+                    </div> \
+                 </div>')
       .insertAfter('body > .side > .spacer:first')
       .find('ul');
    if(srFilter) {
