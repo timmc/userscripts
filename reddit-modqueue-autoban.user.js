@@ -6,7 +6,7 @@
 // @include        http://www.reddit.com/r/*/about/spam*
 // @include        http://www.reddit.com/r/*/about/reports*
 // @license        GPL
-// @version        3.0.0
+// @version        3.1.0
 // ==/UserScript==
 
 if(!/^http:\/\/www\.reddit\.com\/r\/[0-9a-z_]+\/about\/(spam|modqueue|reports)[\/.?#]?.*$/i.exec(document.location)) {
@@ -275,7 +275,8 @@ function makeBanListing() {
    $('<div class="spacer"> \
          <div class="sidecontentbox autobanlist thing"> \
             <h1> \
-               <a href="http://userscripts.org/scripts/show/82709" title="Go to userscript page">Autoban list</a> \
+               <a href="http://userscripts.org/scripts/show/82709" title="Go to userscript page">Autoban list'+
+               (srFilter ? ' for /r/'+srFilter : '')+'</a> \
             </h1> \
             <div class="content entry"> \
                <div class="collapsed"> \
@@ -315,7 +316,7 @@ function showCurrentBans(store) {
 }
 
 function showLocalBan(sr, uname, listing) {
-   $('<li class="local"><a href="/user/'+uname+'">'+uname+'</a> in <a href="/r/'+sr+'">'+sr+'</a> \
+   $('<li class="local"><a href="/user/'+uname+'">'+uname+'</a> '+(srFilter ? '' : 'in <a href="/r/'+sr+'">'+sr+'</a> ')+'\
           [<a class="unban" href="javascript:void()" title="Remove user from autoban list">unban</a>] \
           [<a class="sitewide" href="javascript:void()" title="Make this a site-wide ban">global</a>]</li>')
       .appendTo(listing)
