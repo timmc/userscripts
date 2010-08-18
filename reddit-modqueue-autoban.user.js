@@ -6,7 +6,7 @@
 // @include        http://www.reddit.com/r/*/about/spam*
 // @include        http://www.reddit.com/r/*/about/reports*
 // @license        GPL
-// @version        2.1.2
+// @version        2.2
 // ==/UserScript==
 
 if(!/^http:\/\/www\.reddit\.com\/r\/[0-9a-z_]+\/about\/(spam|modqueue|reports)[\/.?#]?.*$/i.exec(document.location)) {
@@ -309,7 +309,7 @@ function showGlobalBan(uname, srs, listing) {
 }
 
 function fail(msg) {
-   $('<div style="color: red; border: 1px solid red; padding: .25em; font-size: 15px"></div>').text("autoban script error: "+msg).prependTo('body');
+   $('<div class="gmerror"></div>').text("autoban script error: "+msg).prependTo('body');
    throw msg;
 }
 
@@ -317,26 +317,75 @@ function fail(msg) {
  * CORE *
  *======*/
 
-function judgeItem(item, k, store) {
-   var pause = 0;
-   var user = $(item).find('.author').eq(0).text();
-   var subreddit = srFilter || $(item).find('.subreddit').eq(0).text();
-   if(isBanned(store, user, subreddit)) {
-      $('.big-mod-buttons .negative', item).click();
-      $(item).add($(item).next('.clearleft')).remove();
-      pause = 2000; // give the removal time to run
+// An array-backed queue whose start is marked by an index.
+var removalQ = [];
+var remQdex = 0; // if queue is empty, this is == removalQ.length
+
+var remWorking = false;
+
+function killNextItem(k) {
+   if(remWorking) return;
+   
+   var item = removalQ[remQdex];
+   if(!item) {
+      if(k) k();
+      return;
    }
-   setTimeout(partial(k, store), pause);
+   var $el = $(item.el);
+   $el.prepend($killspinner);
+   
+   remWorking = true;
+   $.ajax({
+      type: 'POST',
+      url: '/api/remove',
+      data: {
+         id: $el.thing_id(),
+         uh: reddit.modhash,
+         r: item.sr,
+         renderstyle: 'html'
+      },
+      success: partial(killSucceed, k),
+      error: partial(killFail, k),
+      timeout: 3000,
+      dataType: 'json'
+   });
+}
+
+function killSucceed(k, data, status, xhr) {
+   remWorking = false;
+   $(removalQ[remQdex].el).slideUp().queue(function() {
+      $(this).remove().dequeue();
+   });
+   remQdex++;
+
+   killNextItem(k);
+}
+
+function killFail(k, xhr, status, error) {
+   remWorking = false;
+   
+   fail("Error removing "+$(removalQ[remQdex]).thing_id()+". status=["+xhr.status+"] status=["+status+"] error=["+error+"]");
+}
+
+function judgeItem(store, i, el) {
+   if($(el).find('.negative').size() == 0) return; // already removed
+   var user = $(el).find('.author').eq(0).text();
+   var subreddit = srFilter || $(el).find('.subreddit').eq(0).text();
+   if(isBanned(store, user, subreddit)) {
+      $(el).addClass('doomed');
+      removalQ.push({el:el, sr:subreddit, uname:user});
+   }
 }
 
 function scanAndNuke(store, k) {
-   kEach(judgeItem, $('#siteTable > .thing'), k, store);
+   $('#siteTable > .thing').each(partial(judgeItem, store));
+   killNextItem(k);
 }
 
 function addBanLink(i, el) {
    var $buttons = $('.buttons', el);
-   $('<li><a class="autoban" href="javascript:void(0)" title="Automatically remove this user\'s posts from this subreddit, always">autoban</a></li>')
-      .bind('click', partial(askedAutoban, el))
+   $('<li class="autoban"><a href="javascript:void(0)" title="Automatically remove this user\'s posts from this subreddit, always">autoban</a></li>')
+      .find('a').bind('click', partial(askedAutoban, el)).end()
       .appendTo($buttons); // Would like .appendTo('.buttons', el), but... http://dev.jquery.com/ticket/6856
 }
 
@@ -360,11 +409,8 @@ function askedAutoban(item) {
    setStore(store);
    
    showCurrentBans(store);
+   scanAndNuke(store);
    
-   var miniStore = makeEmptyStore();
-   banUser(miniStore, sr, user);
-   scanAndNuke(miniStore);
-      
    return false;
 }
 
@@ -384,6 +430,10 @@ function askedPromote(uname) {
    promoteBan(store, uname);
    showCurrentBans(store);
    setStore(store);
+   
+   if(!srFilter) {
+      scanAndNuke(store);
+   }
    
    return false;
 }
@@ -427,6 +477,15 @@ window.autoban = {
  * INIT *
  *======*/
 
+$('head').append('<style type="text/css"> \
+                     #siteTable .doomed { border: 4px dotted black; } \
+                     #siteTable .doomed .big-mod-buttons { opacity: .3; } \
+                     #siteTable .doomed .autoban { display: none; } \
+                     #siteTable img.killspinner { float: right; } \
+                     body > .gmerror { color: red; border: 1px solid red; padding: .25em; font-size: 15px; } \
+                  </style>');
+
+var $killspinner = $('<img class="killspinner" src="data:image/gif;base64,R0lGODlhEAAQAPEAAP%2F%2F%2FwAAADY2NgAAACH%2FC05FVFNDQVBFMi4wAwEAAAAh%2FhpDcmVhdGVkIHdpdGggYWpheGxvYWQuaW5mbwAh%2BQQJCgAAACwAAAAAEAAQAAACLYSPacLtvkA7U64qGb2C6gtyXmeJHIl%2BWYeuY7SSLozV6WvK9pfqWv8IKoaIAgAh%2BQQJCgAAACwAAAAAEAAQAAACLYSPacLtvhY7DYhY5bV62xl9XvZJFCiGaReS1Xa5ICyP2jnS%2BM7drPgIKoaIAgAh%2BQQJCgAAACwAAAAAEAAQAAACLISPacLtvk6TE4jF6L3WZsyFlcd1pEZhKBixYOie8FiJ39nS97f39gNUCBEFACH5BAkKAAAALAAAAAAQABAAAAIshI9pwu2%2BxGmTrSqjBZlqfnnc1onmh44RxoIp5JpWN2b1Vdvn%2FZbPb1MIAQUAIfkECQoAAAAsAAAAABAAEAAAAi2Ej2nC7b7YaVPEamPOgOqtYd3SSeFYmul0rlcpnpyXgu4K0t6mq%2FwD5CiGgAIAIfkECQoAAAAsAAAAABAAEAAAAiyEj2nC7b7akSuKyXDE11ZvdWLmiQB1kiOZdifYailHvzBko5Kpq%2BHzUAgRBQA7AAAAAAAAAAAA"/>');
 var initStore = getStore();
 makeBanListing();
 showCurrentBans(initStore);
