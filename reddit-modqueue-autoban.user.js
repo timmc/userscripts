@@ -6,10 +6,10 @@
 // @include        http://www.reddit.com/r/*/about/spam*
 // @include        http://www.reddit.com/r/*/about/reports*
 // @license        GPL
-// @version        2.0
+// @version        2.1
 // ==/UserScript==
 
-if(!/^http:\/\/www\.reddit\.com\/r\/[0-9a-z_]+\/about\/(spam|modqueue|reports)[\/.?#]?.*$/gi.exec(document.location)) {
+if(!/^http:\/\/www\.reddit\.com\/r\/[0-9a-z_]+\/about\/(spam|modqueue|reports)[\/.?#]?.*$/i.exec(document.location)) {
    return;
 }
 
@@ -233,7 +233,7 @@ function demoteBan(store, uname) {
 }
 
 function isBanned(store, uname, sr) {
-   return store.sitewide.indexOf(uname) != -1 || store.byreddit[sr] && store.byreddit[sr].indexOf(uname) != -1;
+   return store.sitewide[uname] || store.byreddit[sr] && store.byreddit[sr].indexOf(uname) != -1;
 }
 
 /*=====*
