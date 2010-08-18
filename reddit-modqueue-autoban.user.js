@@ -6,7 +6,7 @@
 // @include        http://www.reddit.com/r/*/about/spam*
 // @include        http://www.reddit.com/r/*/about/reports*
 // @license        GPL
-// @version        1.3
+// @version        1.3.1
 // ==/UserScript==
 
 if(!/^http:\/\/www\.reddit\.com\/r\/[0-9a-z_]+\/about\/(spam|modqueue|reports)[\/.?#]?.*$/gi.exec(document.location)) {
@@ -108,7 +108,7 @@ var srFilter = reddit.post_site || null;
  *======*/
 
 const cookieStore = 'autoban';
-const storeVersion = 0; // must match script major version
+const storeVersion = 1; // must match script major version
 
 function upgradeStore(store) {
    //for now, it is this simple
