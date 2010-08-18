@@ -6,7 +6,7 @@
 // @include        http://www.reddit.com/r/*/about/spam*
 // @include        http://www.reddit.com/r/*/about/reports*
 // @license        GPL
-// @version        2.1.1
+// @version        2.1.2
 // ==/UserScript==
 
 if(!/^http:\/\/www\.reddit\.com\/r\/[0-9a-z_]+\/about\/(spam|modqueue|reports)[\/.?#]?.*$/i.exec(document.location)) {
@@ -322,7 +322,7 @@ function judgeItem(item, k, store) {
    var user = $(item).find('.author').eq(0).text();
    var subreddit = srFilter || $(item).find('.subreddit').eq(0).text();
    if(isBanned(store, user, subreddit)) {
-      $('.big-mod-buttons .negative', item).attr('onclick', '').click();
+      $('.big-mod-buttons .negative', item).click();
       $(item).add($(item).next('.clearleft')).remove();
       pause = 2000; // give the removal time to run
    }
@@ -361,10 +361,10 @@ function askedAutoban(item) {
    
    showCurrentBans(store);
    
-   var miniDir = {};
-   miniDir[sr] = [user];
-   scanAndNuke(miniDir);
-   
+   var miniStore = makeEmptyStore();
+   banUser(miniStore, sr, user);
+   scanAndNuke(miniStore);
+      
    return false;
 }
 
