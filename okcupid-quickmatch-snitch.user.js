@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name           OKCupid: Quickmatch Snitch
 // @namespace      tag:brainonfire.net,2008-12-30:okcupid-quickmatch-snitch
-// @description    Add a link to the user's profile at the top of the QuickMatch page, since OKCupid leaves out important information such as the user's first essay, and whether they smoke.
+// @description    Add more info to QuickMatch screen, such as links to uncropped photos and the user's profile page.
 // @include        http://www.okcupid.com/quickmatch
-// @version        0.1
+// @version        0.2
 // ==/UserScript==
 
 
@@ -20,6 +20,7 @@ function $xpath(p, context)
 	return arr;
 }
 
+// profile link
 
 var uname = $xpath('//form[@id="essays-form"]//input[@name="sn"]/@value')[0].nodeValue;
 
@@ -31,4 +32,31 @@ var QM_title_span = $xpath('//div[@id="main_content"]/h1[1]/span')[0];
 QM_title_span.parentNode.insertBefore(profLink, QM_title_span.nextSibling);
 QM_title_span.parentNode.insertBefore(document.createTextNode(' '), QM_title_span.nextSibling);
 QM_title_span.textContent += ':';
+
+// uncropped images
+
+var re_cropscale = /\/([0-9]+x[0-9]+\/){4}/gi;
+var bigImage = document.getElementById('user_image');
+
+function repointOrigLink()
+{
+	try
+	{
+		var cropSrc = bigImage.getAttribute('src');
+		var origSrc = cropSrc.replace(re_cropscale, '/0x0/0x0/0x0/0x0/');
+		origLink.setAttribute('href', origSrc);
+	}
+	catch(e) { GM_log("QuickMatch page structure has changed, couldn't link to uncropped image."); }
+	
+	return true;
+}
+
+var origLink = document.createElement('a');
+origLink.setAttribute('title', 'See original, without cropping or scaling');
+repointOrigLink();
+
+bigImage.parentNode.insertBefore(origLink, bigImage);
+origLink.appendChild(bigImage);
+
+bigImage.addEventListener('DOMAttrModified', repointOrigLink, false);
 
