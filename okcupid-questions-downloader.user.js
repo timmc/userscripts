@@ -5,10 +5,13 @@
 // @todo          Read created questions
 // @include       http://www.okcupid.com/questions
 // @require       http://code.jquery.com/jquery-1.3.2.js
-// @version       2.0
+// @version       2.1
 // ==/UserScript==
 
+// For Greasemonkey users
 GM_registerMenuCommand("Harvest question data", main);
+// For users of other userscript plugins
+$('.questions').prevAll('h2').append(" <button>Export</button>").find('button').click(main);
 
 // personal
 //var username;
