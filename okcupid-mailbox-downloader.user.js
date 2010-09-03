@@ -12,11 +12,21 @@
 // ==UserScript==
 // @name           OKCupid mailbox downloader
 // @namespace      tag:brainonfire.net,2008-07-05:okcupid-mailbox-downloader
-// @description    Download your OKCupid inbox and outbox as XML.
+// @description    Download your OKCupid inbox and outbox as XML. (This takes a while.)
 // @include        http://*.okcupid.com/mailbox
 // @include        http://*.okcupid.com/mailbox?folder=*
-// @version        0.3
+// @version        0.4.1
 // ==/UserScript==
+
+
+
+(function(){
+
+
+
+/* Set this variable low (around 4) for testing. This will help you debug core loop issues. */
+var TESTING_MAX_PER_PAGE = 9000; // There will never be 9000 per page, so that's a good default when not actually testing.
+
 
 
 /*=======================================*
@@ -77,13 +87,13 @@ function getUniqueID(prefix)
 var xmlCompatVer = '1';
 
 var re_findMessageListContainer = /<table .*?id="mailListTable".*?>(.*?)<\/table>/;
-var re_getOneMessageLine = /name="selectedMsgs" value="([0-9]+)".+?(?:\/profile\?u=([0-9a-z_-]+)|<span class="msgSysName">(.+?)<\/span>).+?Subject: (.+?)\s*?<.+?md\(([0-9,]+?)\)/gi;
+var re_getOneMessageLine = /name="selectedMsgs" value="([0-9]+)".+?(?:\/profile\?u=([0-9a-z_-]+)|<span class="msgSysName">(.+?)<\/span>).+?(?:user|system)MailSubj.+?readmsg=true.+?>(.+?)<.+?md\(([0-9,]+?)\)/gi;
 	var redex_msg_id = 1;
 	var redex_msg_interlocutor = 2;
-	var redex_msg_subject = 3;
-	var redex_msg_date = 4;
-var re_okcDate = /^([0-9]{4}),([0-9]{1,2}),([0-9]{1,2}),([0-9]{1,2}),([0-9]{1,2}),([0-9]{1,2})$/g;
-var re_message_body = /<form.+?name="folderList".+?name="body"\s+?value="(.*?)"/;
+	var redex_msg_interlocutorAlt = 3;
+	var redex_msg_subject = 4;
+	var redex_msg_date = 5;
+ar re_message_body = /<form.+?name="folderList".+?name="body"\s+?value="(.*?)"/;
 
 // DOM cache
 
@@ -105,6 +115,8 @@ var curFolderIndex = 0; // 0, 1 (not the same folder.id)
 
 var msgTable = undefined; // the current page's message list, as a string
 var curMessageData = undefined; // the current message's metadata, as an object: {id, interlocutor, subject, date}
+
+var msgsSoFarThisPage = 0;
 
 //Data
 
@@ -164,6 +176,28 @@ function requestFail(resp)
 }
 
 /**
+ * Make an asynchronous request for a page.
+ */
+function makeAsyncCall(url, callback)
+{
+	var xhr = new XMLHttpRequest();
+	xhr.open('GET', url, true);
+	xhr.onreadystatechange = function()
+	{
+		//GM_log('Readystate change to '+xhr.readyState+' on url '+url);
+		
+		if(xhr.readyState === 4)
+		{
+			if(xhr.status !== 200)
+				return requestFail(xhr);
+			
+			callback(xhr); // goto 2
+		}
+	};
+	xhr.send(null);
+}
+
+/**
  * Build an RFC 2822 date string from the OKC representation.
  */
 function makeProperDate(dateCommas)
@@ -172,7 +206,7 @@ function makeProperDate(dateCommas)
 }
 
 /**
- * Escape & < "
+ * Escape & < > "
  * (escapeXMLTextNode as well as quotes)
  */
 function escapeXMLAttrib(data)
@@ -181,11 +215,11 @@ function escapeXMLAttrib(data)
 }
 
 /**
- * Escape & <
+ * Escape & < >
  */
 function escapeXMLTextNode(data)
 {
-	return (''+data).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+	return (''+data).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 /**
@@ -193,30 +227,25 @@ function escapeXMLTextNode(data)
  */
 function addXML(lines)
 {
+	//GM_log('Emitting XML: '+lines);
+	
 	dataOutputArea.value = dataOutputArea.value + lines + '\r\n';
 }
 
 /**
- * Close off one folder, start the next.
- * Return true if more folders to go.
+ * Emit XML start tag for folder.
  */
-function folderBoundary()
+function writeBeginFolder()
 {
-	GM_log('folder boundary');	
-	
-	//close previous
-	if(curFolderIndex > 0)
-		addXML('\t</folder>');
-	
-	//iterate
-	curFolderIndex++;
-	
-	//check edge condition
-	if(curFolderIndex >= folders.length)
-		return false;
-
-	//open next
 	addXML('\t<folder id="'+escapeXMLAttrib(folders[curFolderIndex].id)+'" name="'+escapeXMLAttrib(folders[curFolderIndex].name)+'">');
+}
+
+/**
+ * Emit XML end tag for folder.
+ */
+function writeEndFolder()
+{
+	addXML('\t</folder>');
 }
 
 
@@ -230,23 +259,20 @@ function folderBoundary()
  */
 function askForOnePage()
 {
-	//check for terminal state
+	// check for terminal state
 	if(curFolderIndex >= folders.length)
-	{
 		return finishDownloadSequence(); // goto 5
-	}
+	
+	// check for start of folder
+	if(curPageIndex === 0)
+		writeBeginFolder();
+	
+	msgsSoFarThisPage = 0;
 	
 	updateStatus('Requesting page index '+curPageIndex+' of your '+folders[curFolderIndex].name);
 	
 	var nextURL = '/mailbox?folder='+folders[curFolderIndex].id+'&next='+curPageIndex;
-	
-	GM_xmlhttpRequest(
-	{
-		method: 'GET',
-		url: nextURL,
-		onload: processOnePage, // goto 2
-		onerror: requestFail
-	});
+	makeAsyncCall(nextURL, processOnePage); // goto 2
 }
 
 /**
@@ -256,13 +282,11 @@ function processOnePage(resp)
 {
 	updateStatus('Processing page '+curPageIndex+' in '+folders[curFolderIndex].name);
 
-	if(resp.status !== 200)
-		requestFail(resp);
 	GM_log('Received: ' + getPrintableResponse(resp));
 	
 	//process data
 
-	var data = resp.responseText.replace(/[\n\r]/g, ' '); // regexes have a hard time with linebreaks
+	var data = resp.responseText.replace(/\s+?/g, ' '); // regexes have a hard time with linebreaks
 	
 	msgTable = re_findMessageListContainer.exec(data); // global
 	if(msgTable === null)
@@ -271,8 +295,12 @@ function processOnePage(resp)
 	
 	if(!msgTable.match(/readMessage/g)) // we've reached the end of the folder
 	{
-		folderBoundary();
-		askForOnePage(); // goto 1: this will determine whether we're done with all folders, even though folderBoundary() knows too
+		writeEndFolder();
+		
+		curFolderIndex++;
+		curPageIndex = 0;
+		
+		return askForOnePage(); // goto 1: this will determine whether we're done with all folders
 	}
 	
 	// We have more messages! So let's start parsing them.
@@ -287,7 +315,7 @@ function askForOneMessage()
 {
 	var oneMatch = re_getOneMessageLine.exec(msgTable)
 	
-	if(!oneMatch)
+	if(!oneMatch || msgsSoFarThisPage >= TESTING_MAX_PER_PAGE) //XXX
 	{
 		updateStatus('Done with page index '+curPageIndex);
 		curPageIndex++;
@@ -298,22 +326,17 @@ function askForOneMessage()
 	curMessageData = 
 	{
 		id: oneMatch[redex_msg_id],
-		interlocutor: oneMatch[redex_msg_interlocutor],
+		interlocutor: (oneMatch[redex_msg_interlocutor] || oneMatch[redex_msg_interlocutorAlt]),
 		date: makeProperDate(oneMatch[redex_msg_date]),
-		subject: oneMatch[redex_msg_subject]
+		subject: oneMatch[redex_msg_subject].replace(/^\s+|\s+$/g, '')
 	};
 
 	updateStatus('Requesting message '+curMessageData.id);
 	
-	var msgBodyURL = '/mailbox?readmsg=true&msg_headerid='+curMessageData.id+'&folderid='+folders[curFolderIndex].id;
+	msgsSoFarThisPage++;
 	
-	GM_xmlhttpRequest(
-	{
-		method: 'GET',
-		url: msgBodyURL,
-		onload: processOneMessage, // goto 4
-		onerror: requestFail
-	});
+	var msgBodyURL = '/mailbox?readmsg=true&msg_headerid='+curMessageData.id+'&folderid='+folders[curFolderIndex].id;
+	makeAsyncCall(msgBodyURL, processOneMessage); // goto 4
 }
 
 /**
@@ -323,20 +346,18 @@ function processOneMessage(resp)
 {
 	updateStatus('Processing message ID '+curMessageData.id+' in '+folders[curFolderIndex].name);
 
-	if(resp.status !== 200)
-		requestFail(resp);
 	GM_log('Received: ' + getPrintableResponse(resp));
 	
 	//process data
 
-	var data = resp.responseText.replace(/[\n\r]/g, ' '); // regexes have a hard time with linebreaks
+	var data = resp.responseText.replace(/\s+?/g, ' '); // regexes have a hard time with linebreaks
 	
 	var msgBody = re_message_body.exec(data);
 	if(!msgBody)
 		fail('Could not find body text of message ID '+curMessageData.id, 'Received: '+getPrintableResponse(resp));
 	msgBody = msgBody[1];
 	
-	addXML('\t\t<message id="'+curMessageData.id+'" date="'+curMessageData.date+'" interlocutor="'+escapeXMLAttrib(curMessageData.interlocutor)+'" subject="'+escapeXMLAttrib(curMessageData.subject)+'">'+msgBody+'</message>');
+	addXML('\t\t<message id="'+curMessageData.id+'" date="'+curMessageData.date+'" interlocutor="'+escapeXMLAttrib(curMessageData.interlocutor)+'" subject="'+escapeXMLAttrib(curMessageData.subject)+'">'+escapeXMLTextNode(msgBody.replace(/&quot;/g, '"'))+'</message>');
  
 	askForOneMessage(); // goto 3
 }
@@ -442,8 +463,7 @@ function startDownloadSequence(evt)
 	createInfobox();
 	checkDOMAndPaths();
 	addXML('<OKCupidMailbox version="'+xmlCompatVer+'">');
-	folderBoundary();
-	
+
 	GM_log('About to make first call.');
 
 	askForOnePage();
@@ -455,7 +475,6 @@ function startDownloadSequence(evt)
  */
 function finishDownloadSequence(evt)
 {
-	folderBoundary();
 	addXML('</OKCupidMailbox>');
 	
 	updateStatus('Done! Copy this to a file called OKMail.xml and keep it safe.');
@@ -485,3 +504,6 @@ function insertTriggerLink()
 //start it all
 insertTriggerLink();
 
+
+
+})();
