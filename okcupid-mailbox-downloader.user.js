@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name           OKCupid mailbox downloader
 // @namespace      tag:brainonfire.net,2008-07-05:okcupid-mailbox-downloader
-// @description    Download your OKCupid inbox or outbox 
+// @description    Download your OKCupid inbox and outbox as XML.
 // @include        http://*.okcupid.com/mailbox
 // @include        http://*.okcupid.com/mailbox?folder=*
-// @version        0.1
+// @version        0.2
 // ==/UserScript==
 
 /*
@@ -49,8 +49,13 @@ function getUniqueID(prefix)
 
 //Constants
 
-var INBOX_FOLDER = 1;
-var OUTBOX_FOLDER = 2;
+var re_findMessageListContainer = /<table .*?id="mailListTable".*?>(.*?)<\/table>/;
+var re_getOneMessageLine = /name="selectedMsgs" value="([0-9]+)".+?\/profile\?u=([0-9a-z_-]+).+Subject: (.+?)\s*?<.+?md\(([0-9,]+?)\)/gi;
+	var redex_msg_id = 1;
+	var redex_msg_user = 2;
+	var redex_msg_subject = 3;
+	var redex_msg_date = 4;
+var re_okcDate = /^([0-9]{4}),([0-9]{1,2}),([0-9]{1,2}),([0-9]{1,2}),([0-9]{1,2}),([0-9]{1,2})$/g;
 
 // DOM cache
 
@@ -65,16 +70,22 @@ var ID_statusTextParent = getUniqueID('statusTextParent');
 var dataOutputArea = undefined; // textarea for XML output
 var ID_dataOutputArea = getUniqueID('dataOutputArea');
 
+//State info
+var curPage = undefined;
+var curFolderID = undefined;
+
 //Data
 
-var allMessages = []; // each message looks like {ID, date, fromUserName, toUserName, subject, body}
-
-//State info
-
-var folderIDs = [INBOX_FOLDER, OUTBOX_FOLDER];
-var folderDex = 0;
-var pages = undefined;
-var curPage = 0;
+/**
+ * folders: [folder]
+ * folder: {ID, name, [message]}
+ * message: {ID, date, interlocutor, subject}
+ */
+var folders = [];
+var inbox = {id: 1, name: 'inbox', messages: []};
+var outbox = {id: 2, name: 'outbox', messages: []};
+folders[inbox.id] = inbox;
+folders[outbox.id] = outbox;
 
 // Main functions
 
@@ -83,6 +94,7 @@ var curPage = 0;
  */
 function updateStatus(msg)
 {
+	GM_log('Status: ' + msg);
 	statusTextNode.nodeValue = msg;
 }
 
@@ -113,61 +125,91 @@ function getPrintableResponse(resp)
  */
 function requestFail(resp)
 {
-	alert('fail');
 	fail('Failed to retrieve a page of results.', 'The server returned the following:\n\n' + getPrintableResponse(resp));
 }
 
 /**
- * Issue a call for the next page.
+ * Build an RFC 2822 date string from the OKC representation.
  */
-function getOnePage()
+function makeProperDate(dateCommas)
 {
-	updateStatus('Requesting page '+curPage+' in folder #'+folderDex);
-	
-	GM_xmlhttpRequest(
-	{
-		method: 'GET',
-		url: '/mailbox?folder='+folderIDs[folderDex]+'&next='+curPage,
-		onload: readOnePage,
-		onerror: requestFail
-	});
+	return new Date(eval('Date.UTC('+dateCommas+')')).toLocaleFormat('%Y-%m-%d %H:%M:%S %Z');
 }
 
 /**
- * Interpret the page, increment the counter, and call for another page.
+ * Retrieve and process one page. Return true if messages were retrieved.
  */
-function readOnePage(resp)
+function doOnePage()
 {
-	alert('succeed');
-	GM_log('success: ' + getPrintableResponse(resp));
-	updateStatus('Processing page '+curPage+' in folder #'+folderDex);
+	//grab data
+	updateStatus('Requesting page '+curPage+' in '+folders[curFolderID].name);
 	
-	var data = resp.responseText;
+	var nextURL = '/mailbox?folder='+folders[curFolderID].id+'&next='+curPage;
 	
-	if(data.indexOf('readMessage') === -1)
-	{
-		folderDex++;
-		if(folderDex === folderIDs.length)
-		{
-			finishDownloadSequence();
-			return;
-		}
+	if(!window.confirm('Requesting '+nextURL))
+		throw new Exception('killed');
+	
+	xhr = new XMLHttpRequest();
+	xhr.open('GET', nextURL, false);
+	xhr.send(null);
 
-		curPage = 0;
-		getOnePage();
-		return;
+	GM_log('Received: ' + getPrintableResponse(xhr));
+	
+	if(xhr.status !== 200)
+		requestFail(xhr);
+	
+	//process data
+	updateStatus('Processing page '+curPage+' in '+folders[curFolderID].name);
+
+	var data = xhr.responseText.replace(/[\t\n\r]/g, ' ');
+	var msgTable = re_findMessageListContainer.exec(data);
+	if(msgTable === null)
+		fail('Could not find message list container in page.');
+	msgTable = msgTable[1];
+	
+	if(!msgTable.match(/readMessage/g))
+		return false;
+	
+	var oneMatch = undefined;
+	while(oneMatch = re_getOneMessageLine.exec(msgTable))
+	{
+		updateStatus('Adding message '+oneMatch[redex_msg_id]);
+		
+		folders[curFolderID].messages.push(
+		{
+			id: oneMatch[redex_msg_id],
+			interlocutor: oneMatch[redex_msg_user],
+			date: makeProperDate(oneMatch[redex_msg_date]),
+			subject: oneMatch[redex_msg_subject]
+		});
 	}
 	
-	curPage++;
-	getOnePage();
+	//XXX
+	unsafeWindow.results = folders;
+	
+	return true;
 }
 
 /**
- * 
+ * Grab all pages, using synchronous AJAX calls.
  */
-function readOneMessage(msgID)
+function pullAllPages()
 {
-
+	var xhr = undefined;
+	
+	var numMessages = undefined;
+	
+	folders.forEach(function(folder, folderID, allFolders) // folders
+	{
+		curPage = 0;
+		curFolderID = folderID;
+		
+		while(doOnePage()) // pages
+		{
+			curPage++;
+		}
+	});
+	
 }
 
 
@@ -190,14 +232,14 @@ function createInfobox()
 			top: '+window.innerHeight/4+'px; \
 			left: '+window.innerWidth/4+'px; \
 			padding: 4px; \
-			border: 1px solid black; \
+			border: 4px solid black; \
 			background: white; \
 			overflow: auto;\
 		} \
 		\
-		div#'+ID_infobox+'.failure { color: #800; } \
-		div#'+ID_infobox+'.inprogress { color: #860; } \
-		div#'+ID_infobox+'.success { color: #080; } \
+		div#'+ID_infobox+'.failure { color: #800; border-color: red; } \
+		div#'+ID_infobox+'.inprogress { color: #860; border-color: yellow; } \
+		div#'+ID_infobox+'.success { color: #080; border-color: green; } \
 		'
 	);
 	
@@ -250,7 +292,7 @@ function analyzeRequest()
 /**
  * Create infobox, start XHR chain.
  */
-function startDownloadSequence(evt)
+function doDownloadSequence(evt)
 {
 	evt.preventDefault();
 	evt.stopPropagation();
@@ -259,19 +301,17 @@ function startDownloadSequence(evt)
 	
 	createInfobox();
 	analyzeRequest();
-	getOnePage();
-}
 
-/**
- * Collect data and present it.
- */
-function finishDownloadSequence()
-{
+	pullAllPages();
+
 	updateStatus('Building XML file');
 	//TODO
+	
 		
 	infobox.setAttribute('class', 'success');
+
 }
+
 
 /**
  * Add "download mail" link to header.
@@ -285,7 +325,7 @@ function insertTriggerLink()
 	
 	downloadTrigger = document.createElement('button');
 	downloadTrigger.appendChild(document.createTextNode('download'));
-	downloadTrigger.addEventListener('click', startDownloadSequence, false);
+	downloadTrigger.addEventListener('click', doDownloadSequence, false);
 	
 	mailboxHeader.appendChild(document.createTextNode(' '));
 	mailboxHeader.appendChild(downloadTrigger);
