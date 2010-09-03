@@ -1,11 +1,11 @@
 // ==UserScript==
-// @name          OKCupid questions downloader
+// @name          OKCupid questions downloader (data compat: v2)
 // @namespace     tag:brainonfire.net,2009-11-17:okcupid-questions-downloader
 // @description   Download your answers to OKCupid match questions as JSON. (This takes a while.) http://www.okcupid.com/questions
 // @todo          Read created questions
 // @include       http://www.okcupid.com/questions
 // @require       http://code.jquery.com/jquery-1.3.2.js
-// @version       1.0
+// @version       2.0
 // ==/UserScript==
 
 GM_registerMenuCommand("Harvest question data", main);
@@ -82,7 +82,10 @@ function makeGUI() {
  */
 function finish()
 {
-	outputBox.value = uneval(questions);
+	outputBox.value = uneval({data: questions, /*# Questions #*/
+	                          version: 2, /*# Integer:2 #*/
+	                          date: new Date().toUTCString() /*# String (date in RFC 822 with UTC timezone) #*/
+	});
 	
 	updateStatus('Done!');
 }
@@ -151,7 +154,7 @@ function processQuestion(i, el) {
 	if(!isSkipped) {
 		explanation = $q.find('.explanation').text() | null;
 		isPublic = $q.hasClass('public');
-		importance = Number($q.find('input#question_'+qID+'_importance').attr('value'));
+		importance = 5 - Number($q.find('input#question_'+qID+'_importance').attr('value')); // regularize from [5,1] to [0,4]
 		answers = {};
 		$q.find('.self_answers > li').each(function processAnswer(i, el) {
 			var $a = $(el);
@@ -173,7 +176,7 @@ function processQuestion(i, el) {
 		/*# Null if isSkipped */
 		explanation: explanation, /*# String #*/
 		isPublic: isPublic, /*# Boolean #*/
-		importance: importance, /*# Integer:[5,1] (irrelevant to mandatory) #*/
+		importance: importance, /*# Integer:[0,4] (irrelevant to mandatory) #*/
 		answers: answers /*# Answers #*/
 		/* #*/
 	};
@@ -207,20 +210,4 @@ function updateStatus(msg)
 	var line = document.createElement('li');
 	line.appendChild(document.createTextNode(msg));
 	eventList.appendChild(line);
-}
-
-/**
- * Chain a sequence of continuations.
- * `calls` should be an array of functions that each accepts a continuation function.
- */
-function doSeq(calls) {
-	if(calls.length <= 0) {
-		return;
-	}
-	
-	setTimeout(function _doNextInSeqAfterWait() {
-		calls[0](function _k() {
-			doSeq(calls.slice(1));
-		});
-	}, 0);
 }
