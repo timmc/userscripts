@@ -12,10 +12,9 @@
 // ==UserScript==
 // @name           OKCupid mailbox downloader
 // @namespace      tag:brainonfire.net,2008-07-05:okcupid-mailbox-downloader
-// @description    Download your OKCupid inbox and outbox as XML. (This takes a while.)
-// @include        http://*.okcupid.com/mailbox
-// @include        http://*.okcupid.com/mailbox?folder=*
-// @version        0.4.1
+// @description    Download your OKCupid inbox and outbox as XML. (This takes a while.) Note: The "Saved Mail" folder is weird. I'm not quite sure how to handle it yet. For now, it is still backed up, but the XML does not include info on whether you sent or received each message.
+// @include        http://*.okcupid.com/mailbox*
+// @version        0.4.2
 // ==/UserScript==
 
 
@@ -93,7 +92,7 @@ var re_getOneMessageLine = /name="selectedMsgs" value="([0-9]+)".+?(?:\/profile\
 	var redex_msg_interlocutorAlt = 3;
 	var redex_msg_subject = 4;
 	var redex_msg_date = 5;
-ar re_message_body = /<form.+?name="folderList".+?name="body"\s+?value="(.*?)"/;
+var re_message_body = /<form.+?name="folderList".+?name="body"\s+?value="(.*?)"/;
 
 // DOM cache
 
@@ -127,7 +126,8 @@ var msgsSoFarThisPage = 0;
  */
 var inbox = {id: 1, name: 'inbox', messages: []};
 var outbox = {id: 2, name: 'outbox', messages: []};
-var folders = [inbox, outbox];
+var savedbox = {id: 3, name: 'saved', messages: []};
+var folders = [inbox, outbox, savedbox];
 
 
 
@@ -152,6 +152,8 @@ function fail(msg, extra)
 {
 	updateStatus(msg);
 	infobox.className = 'failure';
+	
+	alert('Failure!');
 	
 	if(extra)
 		msg += '\n\nExtra info: '+extra;		
@@ -494,7 +496,7 @@ function insertTriggerLink()
 	mailboxHeader = mailboxHeader[0];
 	
 	downloadTrigger = document.createElement('button');
-	downloadTrigger.appendChild(document.createTextNode('download'));
+	downloadTrigger.appendChild(document.createTextNode('Download all mail'));
 	downloadTrigger.addEventListener('click', startDownloadSequence, false);
 	
 	mailboxHeader.appendChild(document.createTextNode(' '));
