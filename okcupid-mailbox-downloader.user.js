@@ -1,15 +1,27 @@
+/**
+ * The core loop of this program runs as follows:
+ * 1. Ask for "next" page of messages using async XHR.
+ *     a. If $curFolderIndex too high, goto #5
+ * 2. Receive page text. Extract message list string and save it as $curPageMessageList.
+ *     a. If no messages, increment $curFolderIndex, write folder-boundary XML, and goto #1
+ * 3. Extract metadata for "next" message from $curPageMessageList, save as $curMessageData. Issue XHR to message's own URL.
+ *     a. If no next message, increment $curPageIndex and goto #1
+ * 4. Receive message text. Extract body, write message XML. Go to #3
+ * 5. Finalize XML and present to user.
+ */
 // ==UserScript==
 // @name           OKCupid mailbox downloader
 // @namespace      tag:brainonfire.net,2008-07-05:okcupid-mailbox-downloader
 // @description    Download your OKCupid inbox and outbox as XML.
 // @include        http://*.okcupid.com/mailbox
 // @include        http://*.okcupid.com/mailbox?folder=*
-// @version        0.2
+// @version        0.3
 // ==/UserScript==
 
-/*
- * Restrict URLs for security and sanity
- */
+
+/*=======================================*
+ * Restrict URLs for security and sanity *
+ *=======================================*/
  
 re_host_onOKC = /(^|\.)okcupid.com$/;
 re_pathPlus_inMailboxFolder = /^\/mailbox(\?folder=[0-9+])?$/;
@@ -22,9 +34,14 @@ if(!re_host_onOKC.test(location.hostname))
 if(!re_pathPlus_inMailboxFolder.test(location.pathname + location.search))
 	return;
 
-/*
- * Library stuff
- */
+
+
+
+
+
+/*===============*
+ * Library stuff *
+ *===============*/
 
 /*LIB: From http://wiki.greasespot.net/Code_snippets */
 function $xpath(p, context)
@@ -47,15 +64,26 @@ function getUniqueID(prefix)
 }
 
 
+
+
+
+
+/*=============*
+ * Global data *
+ *=============*/
+
 //Constants
 
+var xmlCompatVer = '1';
+
 var re_findMessageListContainer = /<table .*?id="mailListTable".*?>(.*?)<\/table>/;
-var re_getOneMessageLine = /name="selectedMsgs" value="([0-9]+)".+?\/profile\?u=([0-9a-z_-]+).+Subject: (.+?)\s*?<.+?md\(([0-9,]+?)\)/gi;
+var re_getOneMessageLine = /name="selectedMsgs" value="([0-9]+)".+?(?:\/profile\?u=([0-9a-z_-]+)|<span class="msgSysName">(.+?)<\/span>).+?Subject: (.+?)\s*?<.+?md\(([0-9,]+?)\)/gi;
 	var redex_msg_id = 1;
-	var redex_msg_user = 2;
+	var redex_msg_interlocutor = 2;
 	var redex_msg_subject = 3;
 	var redex_msg_date = 4;
 var re_okcDate = /^([0-9]{4}),([0-9]{1,2}),([0-9]{1,2}),([0-9]{1,2}),([0-9]{1,2}),([0-9]{1,2})$/g;
+var re_message_body = /<form.+?name="folderList".+?name="body"\s+?value="(.*?)"/;
 
 // DOM cache
 
@@ -71,23 +99,30 @@ var dataOutputArea = undefined; // textarea for XML output
 var ID_dataOutputArea = getUniqueID('dataOutputArea');
 
 //State info
-var curPage = undefined;
-var curFolderID = undefined;
+
+var curPageIndex = 0; // 0, 1, 2... last value brings empty page
+var curFolderIndex = 0; // 0, 1 (not the same folder.id)
+
+var msgTable = undefined; // the current page's message list, as a string
+var curMessageData = undefined; // the current message's metadata, as an object: {id, interlocutor, subject, date}
 
 //Data
 
 /**
  * folders: [folder]
- * folder: {ID, name, [message]}
- * message: {ID, date, interlocutor, subject}
+ * folder: {id, name, [message]}
+ * message: {id, date, interlocutor, subject}
  */
-var folders = [];
 var inbox = {id: 1, name: 'inbox', messages: []};
 var outbox = {id: 2, name: 'outbox', messages: []};
-folders[inbox.id] = inbox;
-folders[outbox.id] = outbox;
+var folders = [inbox, outbox];
 
-// Main functions
+
+
+
+/*==================*
+ * Helper functions *
+ *==================*/
 
 /**
  * Update the status text.
@@ -137,80 +172,184 @@ function makeProperDate(dateCommas)
 }
 
 /**
- * Retrieve and process one page. Return true if messages were retrieved.
+ * Escape & < "
+ * (escapeXMLTextNode as well as quotes)
  */
-function doOnePage()
+function escapeXMLAttrib(data)
 {
-	//grab data
-	updateStatus('Requesting page '+curPage+' in '+folders[curFolderID].name);
-	
-	var nextURL = '/mailbox?folder='+folders[curFolderID].id+'&next='+curPage;
-	
-	if(!window.confirm('Requesting '+nextURL))
-		throw new Exception('killed');
-	
-	xhr = new XMLHttpRequest();
-	xhr.open('GET', nextURL, false);
-	xhr.send(null);
+	return escapeXMLTextNode(''+data).replace(/"/g, '&quot;');
+}
 
-	GM_log('Received: ' + getPrintableResponse(xhr));
+/**
+ * Escape & <
+ */
+function escapeXMLTextNode(data)
+{
+	return (''+data).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+}
+
+/**
+ * Append XML to the output area.
+ */
+function addXML(lines)
+{
+	dataOutputArea.value = dataOutputArea.value + lines + '\r\n';
+}
+
+/**
+ * Close off one folder, start the next.
+ * Return true if more folders to go.
+ */
+function folderBoundary()
+{
+	GM_log('folder boundary');	
 	
-	if(xhr.status !== 200)
-		requestFail(xhr);
+	//close previous
+	if(curFolderIndex > 0)
+		addXML('\t</folder>');
+	
+	//iterate
+	curFolderIndex++;
+	
+	//check edge condition
+	if(curFolderIndex >= folders.length)
+		return false;
+
+	//open next
+	addXML('\t<folder id="'+escapeXMLAttrib(folders[curFolderIndex].id)+'" name="'+escapeXMLAttrib(folders[curFolderIndex].name)+'">');
+}
+
+
+
+/*=====================*
+ * Core loop functions *
+ *=====================*/
+
+/**
+ * 1. Start an XHR for the current page in the current folder.
+ */
+function askForOnePage()
+{
+	//check for terminal state
+	if(curFolderIndex >= folders.length)
+	{
+		return finishDownloadSequence(); // goto 5
+	}
+	
+	updateStatus('Requesting page index '+curPageIndex+' of your '+folders[curFolderIndex].name);
+	
+	var nextURL = '/mailbox?folder='+folders[curFolderIndex].id+'&next='+curPageIndex;
+	
+	GM_xmlhttpRequest(
+	{
+		method: 'GET',
+		url: nextURL,
+		onload: processOnePage, // goto 2
+		onerror: requestFail
+	});
+}
+
+/**
+ * 2. Analyze the page, build a message queue, 
+ */
+function processOnePage(resp)
+{
+	updateStatus('Processing page '+curPageIndex+' in '+folders[curFolderIndex].name);
+
+	if(resp.status !== 200)
+		requestFail(resp);
+	GM_log('Received: ' + getPrintableResponse(resp));
 	
 	//process data
-	updateStatus('Processing page '+curPage+' in '+folders[curFolderID].name);
 
-	var data = xhr.responseText.replace(/[\t\n\r]/g, ' ');
-	var msgTable = re_findMessageListContainer.exec(data);
+	var data = resp.responseText.replace(/[\n\r]/g, ' '); // regexes have a hard time with linebreaks
+	
+	msgTable = re_findMessageListContainer.exec(data); // global
 	if(msgTable === null)
 		fail('Could not find message list container in page.');
 	msgTable = msgTable[1];
 	
-	if(!msgTable.match(/readMessage/g))
-		return false;
-	
-	var oneMatch = undefined;
-	while(oneMatch = re_getOneMessageLine.exec(msgTable))
+	if(!msgTable.match(/readMessage/g)) // we've reached the end of the folder
 	{
-		updateStatus('Adding message '+oneMatch[redex_msg_id]);
-		
-		folders[curFolderID].messages.push(
-		{
-			id: oneMatch[redex_msg_id],
-			interlocutor: oneMatch[redex_msg_user],
-			date: makeProperDate(oneMatch[redex_msg_date]),
-			subject: oneMatch[redex_msg_subject]
-		});
+		folderBoundary();
+		askForOnePage(); // goto 1: this will determine whether we're done with all folders, even though folderBoundary() knows too
 	}
 	
-	//XXX
-	unsafeWindow.results = folders;
-	
-	return true;
+	// We have more messages! So let's start parsing them.
+
+	return askForOneMessage(); // goto 3
 }
 
 /**
- * Grab all pages, using synchronous AJAX calls.
+ * 3: Read one message's metadata, then ask for the message body.
  */
-function pullAllPages()
+function askForOneMessage()
 {
-	var xhr = undefined;
+	var oneMatch = re_getOneMessageLine.exec(msgTable)
 	
-	var numMessages = undefined;
-	
-	folders.forEach(function(folder, folderID, allFolders) // folders
+	if(!oneMatch)
 	{
-		curPage = 0;
-		curFolderID = folderID;
-		
-		while(doOnePage()) // pages
-		{
-			curPage++;
-		}
-	});
+		updateStatus('Done with page index '+curPageIndex);
+		curPageIndex++;
+		return askForOnePage(); // goto 1
+	}
 	
+	//save for step 4
+	curMessageData = 
+	{
+		id: oneMatch[redex_msg_id],
+		interlocutor: oneMatch[redex_msg_interlocutor],
+		date: makeProperDate(oneMatch[redex_msg_date]),
+		subject: oneMatch[redex_msg_subject]
+	};
+
+	updateStatus('Requesting message '+curMessageData.id);
+	
+	var msgBodyURL = '/mailbox?readmsg=true&msg_headerid='+curMessageData.id+'&folderid='+folders[curFolderIndex].id;
+	
+	GM_xmlhttpRequest(
+	{
+		method: 'GET',
+		url: msgBodyURL,
+		onload: processOneMessage, // goto 4
+		onerror: requestFail
+	});
 }
+
+/**
+ * 4: Receive and extract message body, write to XML, go to next message.
+ */
+function processOneMessage(resp)
+{
+	updateStatus('Processing message ID '+curMessageData.id+' in '+folders[curFolderIndex].name);
+
+	if(resp.status !== 200)
+		requestFail(resp);
+	GM_log('Received: ' + getPrintableResponse(resp));
+	
+	//process data
+
+	var data = resp.responseText.replace(/[\n\r]/g, ' '); // regexes have a hard time with linebreaks
+	
+	var msgBody = re_message_body.exec(data);
+	if(!msgBody)
+		fail('Could not find body text of message ID '+curMessageData.id, 'Received: '+getPrintableResponse(resp));
+	msgBody = msgBody[1];
+	
+	addXML('\t\t<message id="'+curMessageData.id+'" date="'+curMessageData.date+'" interlocutor="'+escapeXMLAttrib(curMessageData.interlocutor)+'" subject="'+escapeXMLAttrib(curMessageData.subject)+'">'+msgBody+'</message>');
+ 
+	askForOneMessage(); // goto 3
+}
+
+
+
+
+
+
+/*===============*
+ * GUI functions *
+ *===============*/
+
 
 
 /**
@@ -268,14 +407,11 @@ function createInfobox()
 }
 
 /**
- * Determine how many pages
+ * Make sure the DOM and paths are as they need to be.
  */
-function analyzeRequest()
+function checkDOMAndPaths()
 {
-	updateStatus('Analyzing request');
-	
-	
-	updateStatus('Checking pathnames');
+	updateStatus('Checking page structure and paths.');
 	
 	var countInbox = $xpath('//div[@id="rightContent"]/h1/following-sibling::ul[1][@id="tabs"]/li/a[contains(@href, "mailbox?folder=1")]').length;
 	if(countInbox !== 1)
@@ -284,32 +420,47 @@ function analyzeRequest()
 	var countOutbox = $xpath('//div[@id="rightContent"]/h1/following-sibling::ul[1][@id="tabs"]/li/a[contains(@href, "mailbox?folder=2")]').length;
 	if(countOutbox !== 1)
 		fail('Page structure (or path to mailbox) has changed.', 'Outbox XPath returned '+countOutbox+' results.');
-	
-	
-	updateStatus('Counting messages');
 }
 
 /**
  * Create infobox, start XHR chain.
  */
-function doDownloadSequence(evt)
+function startDownloadSequence(evt)
 {
 	evt.preventDefault();
 	evt.stopPropagation();
 	
+	var proceed = window.confirm(
+		'You are about to download all sent and received messages. This will take some time.\n'+
+		'Please save all documents, and close any memory-intensive programs.'
+	);
+	if(!proceed)
+		return;
+	
 	downloadTrigger.parentNode.removeChild(downloadTrigger);
 	
 	createInfobox();
-	analyzeRequest();
-
-	pullAllPages();
-
-	updateStatus('Building XML file');
-	//TODO
+	checkDOMAndPaths();
+	addXML('<OKCupidMailbox version="'+xmlCompatVer+'">');
+	folderBoundary();
 	
-		
-	infobox.setAttribute('class', 'success');
+	GM_log('About to make first call.');
 
+	askForOnePage();
+}
+
+
+/**
+ * Finish XHR chain, display results.
+ */
+function finishDownloadSequence(evt)
+{
+	folderBoundary();
+	addXML('</OKCupidMailbox>');
+	
+	updateStatus('Done! Copy this to a file called OKMail.xml and keep it safe.');
+
+	infobox.setAttribute('class', 'success');
 }
 
 
@@ -325,7 +476,7 @@ function insertTriggerLink()
 	
 	downloadTrigger = document.createElement('button');
 	downloadTrigger.appendChild(document.createTextNode('download'));
-	downloadTrigger.addEventListener('click', doDownloadSequence, false);
+	downloadTrigger.addEventListener('click', startDownloadSequence, false);
 	
 	mailboxHeader.appendChild(document.createTextNode(' '));
 	mailboxHeader.appendChild(downloadTrigger);
@@ -334,9 +485,3 @@ function insertTriggerLink()
 //start it all
 insertTriggerLink();
 
-/*
-var downloadLink = document.createElement('a');
-downloadLink.setAttribute('href', 'data:application/octet-stream;base64,PHhtbD5IZWxsbywgd29ybGQhPC94bWw+');
-downloadLink.appendChild(document.createTextNode('okcupid-mailbox-phyzome-20080705.xml'));
-document.body.insertBefore(downloadLink, null);
-*/
