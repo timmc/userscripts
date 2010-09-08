@@ -4,7 +4,7 @@
 // @description    Bypass YouTube's age verification requirement to watch marked videos. ONLY allows watching, does not provide a comments page, etc.
 // @include        http://www.youtube.com/verify_age?next_url=*
 // @license        GPL
-// @version        1.0
+// @version        1.1
 // ==/UserScript==
 
 
@@ -42,12 +42,13 @@ function showVideo(ev) {
    
    var vidHTML = ' \
 <object width="425" height="355"> \
-   <param name="movie" value="http://www.youtube.com/v/'+su_videoID+'&autoplay=0&loop=0&showinfo=1&volume=100&start=0"></param> \
+   <param name="movie" value="http://www.youtube.com/v/'+su_videoID+'&autoplay=0&loop=0&showinfo=1&volume=100&start=0&fs=1"></param> \
    <param name="allowscriptaccess" value="always"></param> \
    <param name="volume" value="100"></param> \
    <param name="wmode" value="transparent"></param> \
+   <param name="allowFullScreen" value="true"></param> \
     \
-   <embed src="http://www.youtube.com/v/'+su_videoID+'&autoplay=0&loop=0&showinfo=1&volume=100&start=0" type="application/x-shockwave-flash" allowscriptaccess="always" wmode="transparent" width="425" height="355" volume="100"></embed> \
+   <embed src="http://www.youtube.com/v/'+su_videoID+'&autoplay=0&loop=0&showinfo=1&volume=100&start=0&fs=1" type="application/x-shockwave-flash" allowscriptaccess="always" wmode="transparent" allowFullScreen="true" width="425" height="355" volume="100"></embed> \
 </object> \
    ';
    
