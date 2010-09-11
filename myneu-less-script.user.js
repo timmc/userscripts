@@ -3,7 +3,7 @@
 // @namespace      tag:brainonfire.net,2008-07-27:myneu-less-script
 // @description    Replace Javascript popup links with real links & target=_blank
 // @include        *myneu*
-// @version        0.2
+// @version        0.3
 // ==/UserScript==
 
 
@@ -28,7 +28,7 @@ function generic_location()
 	tabs.forEach(function(link)
 	{
 		var oldHref = link.getAttribute('href');
-		var newHref = oldHref.replace(/^javascript:Open(?:Win)?NEU\('https?:(([^']|\\')+)'\);?$/, '$1');
+		var newHref = oldHref.replace(/^javascript:Open(?:Win)?(?:NEU)?[0-9]* *\('https?:(([^']|\\')+?)'.*\);?$/i, '$1');
 		if(oldHref !== newHref)
 		{
 			link.setAttribute('href', newHref);
