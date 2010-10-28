@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name           Youtube: Bypass age verification (basic)
 // @namespace      tag:brainonfire.net,2010-08-03:youtube-bypass-age
-// @description    Bypass YouTube's age verification requirement to watch marked videos. ONLY allows watching, does not provide a comments page, etc.
+// @description    Bypass YouTube's age verification requirement to watch marked videos. Loads comments below video.
 // @include        http://www.youtube.com/verify_age?next_url=*
 // @license        GPL
-// @version        1.1
+// @version        1.2
 // ==/UserScript==
 
 
@@ -52,7 +52,9 @@ function showVideo(ev) {
 </object> \
    ';
    
-   buttonContainer.innerHTML += vidHTML;
+   var commentsHTML = '<iframe id="injected-comments" src="/comment_servlet?all_comments=1&v='+su_videoID+'" width="500" height="1000" />';
+   
+   buttonContainer.innerHTML += vidHTML + commentsHTML;
 }
 
 function buildButton() {
@@ -70,4 +72,9 @@ function buildButton() {
    button.addEventListener('click', showVideo, false);
 }
 
+function useTitle() {
+   document.title = document.getElementById('verify-age').getElementsByTagName('h2')[0].textContent.replace(/^\s+|\s+$/g,'') + ' | YouTube: Verify age';
+}
+
+try{useTitle();}catch(e){}
 buildButton();
