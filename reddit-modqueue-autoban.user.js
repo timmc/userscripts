@@ -6,7 +6,7 @@
 // @include        http://www.reddit.com/r/*/about/spam*
 // @include        http://www.reddit.com/r/*/about/reports*
 // @license        GPL
-// @version        3.1.1
+// @version        3.1.2
 // ==/UserScript==
 
 if(!/^http:\/\/www\.reddit\.com\/r\/[0-9a-z_]+\/about\/(spam|modqueue|reports)[\/.?#]?.*$/i.exec(document.location)) {
@@ -534,18 +534,27 @@ window.autoban = {
  * INIT *
  *======*/
 
-$('head').append('<style type="text/css"> \
-                     #siteTable .doomed { border: 4px dotted black; } \
-                     #siteTable .doomed .big-mod-buttons { opacity: .3; } \
-                     #siteTable .doomed .autoban { display: none; } \
-                     #siteTable img.killspinner { float: right; } \
-                     body > .gmerror { color: red; border: 1px solid red; padding: .25em; font-size: 15px; } \
-                     body > .gmwarn { background-color: black; color: yellow; border: 2px solid yellow; padding: .25em; font-size: 15px; } \
-                     body > .gmwarn pre { border: 1px solid yellow; overflow: auto; font-size: medium; padding: .4em; margin: .5em; } \
-                  </style>');
+function init() {
+   $('head').append('<style type="text/css"> \
+                        #siteTable .doomed { border: 4px dotted black; } \
+                        #siteTable .doomed .big-mod-buttons { opacity: .3; } \
+                        #siteTable .doomed .autoban { display: none; } \
+                        #siteTable img.killspinner { float: right; } \
+                        body > .gmerror { color: red; border: 1px solid red; padding: .25em; font-size: 15px; } \
+                        body > .gmwarn { background-color: black; color: yellow; border: 2px solid yellow; padding: .25em; font-size: 15px; } \
+                        body > .gmwarn pre { border: 1px solid yellow; overflow: auto; font-size: medium; padding: .4em; margin: .5em; } \
+                     </style>');
+   
+   detectLegacyStore();
+   makeBanListing();
+   var initStore = getStore();
+   showCurrentBans(initStore);
+   scanAndNuke(initStore, innervateRemaining);
+}
 
-detectLegacyStore();
-makeBanListing();
-var initStore = getStore();
-showCurrentBans(initStore);
-scanAndNuke(initStore, innervateRemaining);
+try {
+   init();
+} catch(e) {
+   fail(e);
+}
+
