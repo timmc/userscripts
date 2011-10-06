@@ -110,13 +110,38 @@ function isNaturalNumber(x) {
 
 var srFilter = reddit.post_site || null;
 
-/*======*
- * DATA *
- *======*
- Data store manipulation. */
-
 const storeKey = 'autoban';
 const storeVersion = 3; // must match script major version!
+
+/*======*
+ * DATA *
+ *======*/
+
+function makeEmptyStore() {
+   return {'version':storeVersion, // Datastore compatibility version (matches script major version)
+           'byreddit':{}, // hash of subreddits to username arrays (banned within subreddit)
+           'sitewide':{} // hash of usernames to subreddit name arrays (banned globally, was local to those subreddits)
+   };
+}
+
+function getStore() {
+   var value, store;
+   if(!(value = localStorage.getItem(storeKey)) || !(store = $.secureEvalJSON(value))) {
+      store = makeEmptyStore();
+   }
+   if(store.version != storeVersion) {
+      upgradeStore(store);
+   }
+   return store;
+}
+
+function setStore(store) {
+   localStorage.setItem(storeKey, $.toJSON(store));
+}
+
+/*=========*
+ * UPGRADE *
+ *=========*/
 
 function testWebStorage() {
    var testKey = 'miuwaeikcuhkiwe';
@@ -178,32 +203,6 @@ function upgradeStore(store) {
    case 2:
       store.version = 3;
    }
-}
-
-/*==========*
- * DATA API *
- *==========*/
-
-function makeEmptyStore() {
-   return {'version':storeVersion, // Datastore compatibility version (matches script major version)
-           'byreddit':{}, // hash of subreddits to username arrays (banned within subreddit)
-           'sitewide':{} // hash of usernames to subreddit name arrays (banned globally, was local to those subreddits)
-   };
-}
-
-function getStore() {
-   var value, store;
-   if(!(value = localStorage.getItem(storeKey)) || !(store = $.secureEvalJSON(value))) {
-      store = makeEmptyStore();
-   }
-   if(store.version != storeVersion) {
-      upgradeStore(store);
-   }
-   return store;
-}
-
-function setStore(store) {
-   localStorage.setItem(storeKey, $.toJSON(store));
 }
 
 /*=====*
