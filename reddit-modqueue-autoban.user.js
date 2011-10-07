@@ -6,7 +6,7 @@
 // @include        http://www.reddit.com/r/*/about/spam*
 // @include        http://www.reddit.com/r/*/about/reports*
 // @license        GPL
-// @version        3.1.2
+// @version        3.1.3
 // ==/UserScript==
 
 if(!/^http:\/\/www\.reddit\.com\/r\/[0-9a-z_]+\/about\/(spam|modqueue|reports)[\/.?#]?.*$/i.exec(document.location)) {
@@ -126,7 +126,7 @@ function makeEmptyStore() {
 
 function getStore() {
    var value, store;
-   if(!(value = localStorage.getItem(storeKey)) || !(store = $.secureEvalJSON(value))) {
+   if(!(value = localStorage.getItem(storeKey)) || !(store = $.parseJSON(value))) {
       store = makeEmptyStore();
    }
    if(store.version != storeVersion) {
@@ -170,7 +170,7 @@ function setLegacyStores() {
 
 function detectLegacyStore() {
    var cookie, store;
-   if((cookie = $.cookie(storeKey)) && (store = $.secureEvalJSON(cookie)) && isNaturalNumber(store.version)) { // valid cookie
+   if((cookie = $.cookie(storeKey)) && (store = $.parseJSON(cookie)) && isNaturalNumber(store.version)) { // valid cookie
       if(store.version > 2) { // forwarding cookie -- 2 was the last version to use cookies
          return;
       }
