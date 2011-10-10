@@ -6,7 +6,7 @@
 // @include        http://www.reddit.com/r/*/about/spam*
 // @include        http://www.reddit.com/r/*/about/reports*
 // @license        GPL
-// @version        3.1.3
+// @version        3.1.4
 // ==/UserScript==
 
 if(!/^http:\/\/www\.reddit\.com\/r\/[0-9a-z_]+\/about\/(spam|modqueue|reports)[\/.?#]?.*$/i.exec(document.location)) {
@@ -126,7 +126,7 @@ function makeEmptyStore() {
 
 function getStore() {
    var value, store;
-   if(!(value = localStorage.getItem(storeKey)) || !(store = $.parseJSON(value))) {
+   if(!(value = localStorage.getItem(storeKey)) || !(store = JSON.parse(value))) {
       store = makeEmptyStore();
    }
    if(store.version != storeVersion) {
@@ -136,7 +136,7 @@ function getStore() {
 }
 
 function setStore(store) {
-   localStorage.setItem(storeKey, $.toJSON(store));
+   localStorage.setItem(storeKey, JSON.stringify(store));
 }
 
 /*=========*
@@ -165,12 +165,12 @@ function testWebStorage() {
 }
 
 function setLegacyStores() {
-   $.cookie(storeKey, $.toJSON({version:storeVersion, msg:"We use HTML5 WebStorage as of v3, instead of cookies."}), {expires: 1000, path: '/', domain:'.reddit.com'});
+   $.cookie(storeKey, JSON.stringify({version:storeVersion, msg:"We use HTML5 WebStorage as of v3, instead of cookies."}), {expires: 1000, path: '/', domain:'.reddit.com'});
 }
 
 function detectLegacyStore() {
    var cookie, store;
-   if((cookie = $.cookie(storeKey)) && (store = $.parseJSON(cookie)) && isNaturalNumber(store.version)) { // valid cookie
+   if((cookie = $.cookie(storeKey)) && (store = JSON.parse(cookie)) && isNaturalNumber(store.version)) { // valid cookie
       if(store.version > 2) { // forwarding cookie -- 2 was the last version to use cookies
          return;
       }
@@ -178,7 +178,7 @@ function detectLegacyStore() {
       if(uneval(makeEmptyStore()) != uneval(getStore())) { // Don't overwrite non-empty modern store!
          fail("You have both a cookie and a WebStorage version of autoban! Aborting upgrade.");
       }
-      warn("Upgrading from cookie to HTML5 WebStorage. Just in case your browser fails at WebStorage, keep your data safe for at least one browser restart:", $.toJSON(store));
+      warn("Upgrading from cookie to HTML5 WebStorage. Just in case your browser fails at WebStorage, keep your data safe for at least one browser restart:", JSON.stringify(store));
       upgradeStore(store);
       setStore(store);
    }
