@@ -3,8 +3,8 @@
 // @namespace      tag:brainonfire.net,2009-11-22:gmaps-fullscreen
 // @description    Expand the Google Maps map view to fill the entire page (for better screenshots, etc.) You'll have to collapse the left panel yourself, though! Also, I recommend fullscreening the browser (F11) *after* launching this script. Note that the script is to be launched using the Greasemonkey menu.
 // @include        http://maps.google.com/*
-// @version        0.1
-// @changelog      First version
+// @version        0.2
+// @changelog      Since 0.1: Fix regex for removing class name, actually toggle isFullscreen.
 // ==/UserScript==
 
 
@@ -60,9 +60,11 @@ function toggleFullscreen() {
 /*	ensurePanelHidden();*/
 	
 	if(isFullscreen) {
-		encloser.className = encloser.className.replace(/ fullscreen($| )/, ' ');
+		encloser.className = encloser.className.replace(/(^| )fullscreen($| )/, ' ');
+		isFullscreen = false;
 	} else {
 		encloser.className += ' fullscreen';
+		isFullscreen = true;
 	}
 }
 
