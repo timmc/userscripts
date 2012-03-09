@@ -6,8 +6,8 @@
 // @include        http://www.reddit.com/r/*/about/spam*
 // @include        http://www.reddit.com/r/*/about/reports*
 // @license        GPL
-// @version        3.1.5
-// @changes        Since 3.1.4, adapt to http://redd.it/qksll by updating sought-out button classname (also add clarifying comments)
+// @version        3.1.6
+// @changes        Since 3.1.5: Respect spam vs. dismiss; better sr detection (comments vs. links), hidden pref for auto-collapse
 // ==/UserScript==
 
 if(!/^http:\/\/www\.reddit\.com\/r\/[0-9a-z_]+\/about\/(spam|modqueue|reports)[\/.?#]?.*$/i.exec(document.location)) {
