@@ -310,7 +310,7 @@ function makeBanListing() {
                   <a class="expand" onclick="return showcomment(this)" href="#">[+]</a> \
                   (collapsed) \
                </div> \
-               <div class="noncollapsed" style="display:none"> \
+               <div class="noncollapsed"> \
                   <a class="expand" onclick="return hidecomment(this)" href="#">[-]</a> \
                   <ul class="listing"></ul> \
                </div> \
@@ -318,6 +318,8 @@ function makeBanListing() {
          </div> \
       </div>')
       .insertAfter('body > .side > .spacer:first');
+   var autoOpen = JSON.parse(localStorage.getItem("autoban-default-open")) || false;
+   $(".autobanlist").find(autoOpen ? ".collapsed" : ".noncollapsed").css("display", "none");
 }
 
 function showCurrentBans(store) {
