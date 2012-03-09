@@ -376,7 +376,7 @@ function warn(msg, raw) {
  *======*/
 
 // An array-backed queue whose start is marked by an index.
-var removalQ = [];
+var removalQ = []; // [{el:element, sr:subreddit, uname:username, spam:boolean} ...]
 var remQdex = 0; // if queue is empty, this is == removalQ.length
 
 var remWorking = false; // a lock, protecting removal objects
@@ -403,6 +403,7 @@ function killNextItem(k) {
          id: $el.thing_id(),
          uh: reddit.modhash,
          r: item.sr,
+         spam: item.spam,
          renderstyle: 'html'
       },
       success: partial(killSucceed, k),
@@ -434,9 +435,10 @@ function judgeItem(store, i, el) {
    if($(el).find('.big-mod-buttons .neutral').size() == 0) return; // already removed
    var user = $(el).find('.author').eq(0).text();
    var subreddit = srFilter || $(el).find('.subreddit').eq(0).text();
+   var asSpam = $(el).find('.big-mod-buttons .negative').size() == 1;
    if(isBanned(store, user, subreddit)) {
       $(el).addClass('doomed');
-      removalQ.push({el:el, sr:subreddit, uname:user});
+      removalQ.push({el:el, sr:subreddit, uname:user, spam:asSpam});
    }
 }
 
