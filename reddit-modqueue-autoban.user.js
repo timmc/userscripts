@@ -6,7 +6,8 @@
 // @include        http://www.reddit.com/r/*/about/spam*
 // @include        http://www.reddit.com/r/*/about/reports*
 // @license        GPL
-// @version        3.1.4
+// @version        3.1.5
+// @changes        Since 3.1.4, adapt to http://redd.it/qksll by updating sought-out button classname (also add clarifying comments)
 // ==/UserScript==
 
 if(!/^http:\/\/www\.reddit\.com\/r\/[0-9a-z_]+\/about\/(spam|modqueue|reports)[\/.?#]?.*$/i.exec(document.location)) {
@@ -378,10 +379,13 @@ function warn(msg, raw) {
 var removalQ = [];
 var remQdex = 0; // if queue is empty, this is == removalQ.length
 
-var remWorking = false;
+var remWorking = false; // a lock, protecting removal objects
 
+/** Kill one doomed item and call the continuation k (or async-recurse).
+ * This continuation-passing style allows iteration over a list without
+ * blocking. */
 function killNextItem(k) {
-   if(remWorking) return;
+   if(remWorking) return; // squash any event "threads" that try to interleave with an older one
    
    var item = removalQ[remQdex];
    if(!item) {
@@ -395,7 +399,7 @@ function killNextItem(k) {
    $.ajax({
       type: 'POST',
       url: '/api/remove',
-      data: {
+      data: { // defaults to spam: true
          id: $el.thing_id(),
          uh: reddit.modhash,
          r: item.sr,
@@ -424,8 +428,10 @@ function killFail(k, xhr, status, error) {
    fail("Error removing "+$(removalQ[remQdex]).thing_id()+". status=["+xhr.status+"] status=["+status+"] error=["+error+"]");
 }
 
+/** Judge a thing. If judged as autoban-eligible, add "doomed" class and
+ * queue for removal. */
 function judgeItem(store, i, el) {
-   if($(el).find('.negative').size() == 0) return; // already removed
+   if($(el).find('.big-mod-buttons .neutral').size() == 0) return; // already removed
    var user = $(el).find('.author').eq(0).text();
    var subreddit = srFilter || $(el).find('.subreddit').eq(0).text();
    if(isBanned(store, user, subreddit)) {
@@ -434,7 +440,9 @@ function judgeItem(store, i, el) {
    }
 }
 
+/* 1) Judge all items, 2) remove all doomed, 3) call continuation function. */
 function scanAndNuke(store, k) {
+   if(remWorking) return; // don't stomp on existing "thread"
    $('#siteTable > .thing').each(partial(judgeItem, store));
    killNextItem(k);
 }
