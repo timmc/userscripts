@@ -399,7 +399,7 @@ function killNextItem(k) {
    $.ajax({
       type: 'POST',
       url: '/api/remove',
-      data: { // defaults to spam: true
+      data: {
          id: $el.thing_id(),
          uh: reddit.modhash,
          r: item.sr,
@@ -429,15 +429,31 @@ function killFail(k, xhr, status, error) {
    fail("Error removing "+$(removalQ[remQdex]).thing_id()+". status=["+xhr.status+"] status=["+status+"] error=["+error+"]");
 }
 
-/** Judge a thing. If judged as autoban-eligible, add "doomed" class and
+/** Return subreddit string, or logical false. */
+function subredditOfThing(el) {
+   var sr = null;
+   if($(el).hasClass('link')) {
+      sr = $('.subreddit', el).text();   
+   } else if($(el).hasClass('comment')) {
+      var perm = $(el).find('.bylink').attr('href');
+      sr = /\/r\/([^/]+)/.exec(perm)[1];
+   }
+   if (!sr) {
+      $(el).addClass("autoban-error").addClass("autoban-error_nosr");
+   }
+   return sr;
+}
+
+/** Judge a thing. If judged as autoban-eligible, add "autoban-doomed" class and
  * queue for removal. */
 function judgeItem(store, i, el) {
    if($(el).find('.big-mod-buttons .neutral').size() == 0) return; // already removed
    var user = $(el).find('.author').eq(0).text();
-   var subreddit = srFilter || $(el).find('.subreddit').eq(0).text();
+   var subreddit = subredditOfThing(el);
+   if(!subreddit) return;
    var asSpam = $(el).find('.big-mod-buttons .negative').size() == 1;
    if(isBanned(store, user, subreddit)) {
-      $(el).addClass('doomed');
+      $(el).addClass('autoban-doomed'); // just for visual effects
       removalQ.push({el:el, sr:subreddit, uname:user, spam:asSpam});
    }
 }
@@ -467,7 +483,11 @@ function innervateRemaining() {
 
 function askedAutoban(item) {
    var user = $('.author', item).text();
-   var sr = srFilter || $('.subreddit', item).text();
+   var sr = srFilter || subredditOfThing(item);
+   if(!sr) {
+      window.alert("Could not determine subreddit of item. Aborting.");
+      return;
+   }
    if(!window.confirm('Autoban user '+user+' from '+sr+'?'))
       return;
 
@@ -546,10 +566,11 @@ window.autoban = {
 
 function init() {
    $('head').append('<style type="text/css"> \
-                        #siteTable .doomed { border: 4px dotted black; } \
-                        #siteTable .doomed .big-mod-buttons { opacity: .3; } \
-                        #siteTable .doomed .autoban { display: none; } \
+                        #siteTable .autoban-doomed { border: 4px dotted black; } \
+                        #siteTable .autoban-doomed .big-mod-buttons { opacity: .3; } \
+                        #siteTable .autoban-doomed .autoban { display: none; } \
                         #siteTable img.killspinner { float: right; } \
+                        #siteTable .autoban-error { border: 4px dotted red; } \
                         body > .gmerror { color: red; border: 1px solid red; padding: .25em; font-size: 15px; } \
                         body > .gmwarn { background-color: black; color: yellow; border: 2px solid yellow; padding: .25em; font-size: 15px; } \
                         body > .gmwarn pre { border: 1px solid yellow; overflow: auto; font-size: medium; padding: .4em; margin: .5em; } \
