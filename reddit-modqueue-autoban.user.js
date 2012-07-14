@@ -6,11 +6,11 @@
 // @include        http://www.reddit.com/r/*/about/spam*
 // @include        http://www.reddit.com/r/*/about/reports*
 // @license        GPL
-// @version        3.1.6
-// @changes        Since 3.1.5: Respect spam vs. dismiss; better sr detection (comments vs. links), hidden pref for auto-collapse
+// @version        3.1.7
+// @changes        Since 3.1.6: Fix for detecting subreddit of links; activate on /r/___/about/unmoderated/
 // ==/UserScript==
 
-if(!/^http:\/\/www\.reddit\.com\/r\/[0-9a-z_]+\/about\/(spam|modqueue|reports)[\/.?#]?.*$/i.exec(document.location)) {
+if(!/^http:\/\/www\.reddit\.com\/r\/[0-9a-z_]+\/about\/(spam|modqueue|reports|unmoderated)[\/.?#]?.*$/i.exec(document.location)) {
    return;
 }
 
@@ -313,6 +313,8 @@ function makeBanListing() {
                <div class="noncollapsed"> \
                   <a class="expand" onclick="return hidecomment(this)" href="#">[-]</a> \
                   <ul class="listing"></ul> \
+                  <p>Reminder: Never use this on users who sometimes post \
+                     non-spam content -- it can mis-train the spamfilter.</p> \
                </div> \
             </div> \
          </div> \
@@ -433,12 +435,19 @@ function killFail(k, xhr, status, error) {
 
 /** Return subreddit string, or logical false. */
 function subredditOfThing(el) {
-   var sr = null;
+   var $link = $();
    if($(el).hasClass('link')) {
-      sr = $('.subreddit', el).text();   
+      $link = $(el).find('.entry a.comments');
    } else if($(el).hasClass('comment')) {
-      var perm = $(el).find('.bylink').attr('href');
-      sr = /\/r\/([^/]+)/.exec(perm)[1];
+      $link = $(el).find('.bylink');
+   }
+   var sr;
+   if ($link.size() === 0) {
+      $(el).addClass("autoban-error").addClass("autoban-error_nolink");
+   } else {
+      console.log(el);
+      console.log(/\/r\/([^/]+)/.exec($link.attr('href')));
+      sr = /\/r\/([^/]+)/.exec($link.attr('href'))[1];
    }
    if (!sr) {
       $(el).addClass("autoban-error").addClass("autoban-error_nosr");
@@ -568,15 +577,20 @@ window.autoban = {
 
 function init() {
    $('head').append('<style type="text/css"> \
-                        #siteTable .autoban-doomed { border: 4px dotted black; } \
-                        #siteTable .autoban-doomed .big-mod-buttons { opacity: .3; } \
-                        #siteTable .autoban-doomed .autoban { display: none; } \
-                        #siteTable img.killspinner { float: right; } \
-                        #siteTable .autoban-error { border: 4px dotted red; } \
-                        body > .gmerror { color: red; border: 1px solid red; padding: .25em; font-size: 15px; } \
-                        body > .gmwarn { background-color: black; color: yellow; border: 2px solid yellow; padding: .25em; font-size: 15px; } \
-                        body > .gmwarn pre { border: 1px solid yellow; overflow: auto; font-size: medium; padding: .4em; margin: .5em; } \
-                     </style>');
+  .side .autobanlist p { margin: 1em; font-size: smaller; } \
+  #siteTable .autoban-doomed { border: 4px dotted black; } \
+  #siteTable .autoban-doomed .big-mod-buttons { opacity: .3; } \
+  #siteTable .autoban-doomed .autoban { display: none; } \
+  #siteTable img.killspinner { float: right; } \
+  #siteTable .autoban-error { border: 4px dotted red; } \
+  body > .gmerror { \
+    color: red; border: 1px solid red; padding: .25em; font-size: 15px; } \
+  body > .gmwarn { \
+    background-color: black; color: yellow; border: 2px solid yellow; \
+    padding: .25em; font-size: 15px; } \
+  body > .gmwarn pre { border: 1px solid yellow; overflow: auto; \
+    font-size: medium; padding: .4em; margin: .5em; } \
+</style>');
    
    detectLegacyStore();
    makeBanListing();
