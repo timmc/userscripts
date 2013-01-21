@@ -5,7 +5,8 @@
 // @todo          Read created questions
 // @include       http://www.okcupid.com/questions
 // @require       http://code.jquery.com/jquery-1.3.2.js
-// @version       2.1
+// @version       2.2
+// @changelog     Since 2.1: Actually output JSON, not just serialized JS.
 // ==/UserScript==
 
 // For Greasemonkey users
@@ -85,6 +86,9 @@ function makeGUI() {
  */
 function finish()
 {
+  // Remove this line for older Firefox and Chrome that don't have JSON object:
+  var uneval = JSON.stringify;
+
 	outputBox.value = uneval({data: questions, /*# Questions #*/
 	                          version: 2, /*# Integer:2 #*/
 	                          date: new Date().toUTCString() /*# String (date in RFC 822 with UTC timezone) #*/
