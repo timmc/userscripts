@@ -2,11 +2,11 @@
 // @name           Reddit crosspost helper
 // @namespace      tag:brainonfire.net,2010-07-25:reddit-crosspost
 // @description    Add a "crosspost" link to the toolbar on posts to go to a pre-populated submission page. You will be prompted for a subreddit to post to.
-// @include        http://*.reddit.com/r/*/comments/*/
-// @include        http://*.reddit.com/r/*/submit*type=*
-// @license        GPL
-// @version        1.1
-// @changelog      Since 1.0: Added self-post capability.
+// @include        *.reddit.com/r/*/comments/*
+// @include        *.reddit.com/r/*/submit*type=*
+// @license        EPL
+// @version        1.2
+// @changelog      Since 1.1: Work on https; work with query strings; change license to EPL
 // ==/UserScript==
 
 /** Run entire script inside page. From http://wiki.greasespot.net/Content_Scope_Runner */
@@ -24,10 +24,10 @@ if(typeof __PAGE_SCOPE_RUN__ == 'undefined') {
 /*== Dispatch ==*/
 
 //TODO: Don't require /r/foo URL structure? What about multis?
-var re_post = /^http:\/\/[a-z]+\.reddit\.com\/r\/[a-z0-9_]+\/comments\/([a-z0-9]+)\/[a-z0-9_]+\/$/gi;
+var re_post = /^https?:\/\/[a-z]+\.reddit\.com\/r\/[a-z0-9_]+\/comments\/([a-z0-9]+)\/[a-z0-9_]+\/(\?.*)?$/gi;
 var is_post = re_post.exec(location.href);
 
-var re_sub = /^http:\/\/[a-z]+\.reddit\.com\/r\/[a-z0-9_]+\/submit.*[?&]type=(self|link)(&|$)/gi;
+var re_sub = /^https?:\/\/[a-z]+\.reddit\.com\/r\/[a-z0-9_]+\/submit.*[?&]type=(self|link)(&|$)/gi;
 var is_sub = re_sub.exec(location.href);
 
 if(is_post) {
@@ -37,7 +37,6 @@ if(is_post) {
    var type_str = is_sub[1];
    submissionHelper();
 }
-return;
 
 /*== Case: Comments page ==*/
 
@@ -49,7 +48,7 @@ function addCrosspostLink() {
 }
 
 function grabMetadata(ev) {
-   $.getJSON('http://www.reddit.com/comments/'+thingID+'/_/.json', undefined, goToSubmit);
+   $.getJSON('/comments/'+thingID+'/_/.json', undefined, goToSubmit);
 }
 
 function goToSubmit(data) {
@@ -64,7 +63,7 @@ function goToSubmit(data) {
       var kv_data = "url="+encodeURIComponent(data.url);
    }
    var kv_title = "title="+encodeURIComponent(data.title+" [xpost/"+data.subreddit+"]");
-   document.location = "http://www.reddit.com/r/"+nextReddit+"/submit?"+kv_type+"&"+kv_title+"&"+kv_data;
+   document.location = "/r/"+nextReddit+"/submit?"+kv_type+"&"+kv_title+"&"+kv_data;
 }
 
 /*== Case: Submit page ==*/
