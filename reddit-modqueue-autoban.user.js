@@ -6,8 +6,8 @@
 // @include        http://www.reddit.com/r/*/about/spam*
 // @include        http://www.reddit.com/r/*/about/reports*
 // @license        GPL
-// @version        3.1.7
-// @changes        Since 3.1.6: Fix for detecting subreddit of links; activate on /r/___/about/unmoderated/
+// @version        3.2.0
+// @changes        Since 3.1.7: Fix for reddit's change in mod buttons
 // ==/UserScript==
 
 if(!/^http:\/\/www\.reddit\.com\/r\/[0-9a-z_]+\/about\/(spam|modqueue|reports|unmoderated)[\/.?#]?.*$/i.exec(document.location)) {
@@ -445,8 +445,6 @@ function subredditOfThing(el) {
    if ($link.size() === 0) {
       $(el).addClass("autoban-error").addClass("autoban-error_nolink");
    } else {
-      console.log(el);
-      console.log(/\/r\/([^/]+)/.exec($link.attr('href')));
       sr = /\/r\/([^/]+)/.exec($link.attr('href'))[1];
    }
    if (!sr) {
