@@ -4,9 +4,11 @@
 // @description Present both email and password fields on Google login screen, just like the old days
 // @include     https://accounts.google.com/ServiceLogin
 // @include     https://accounts.google.com/ServiceLogin?*
+// @include     https://accounts.google.com/ServiceLogin#*
 // @include     https://accounts.google.com/ServiceLoginAuth
 // @include     https://accounts.google.com/ServiceLoginAuth?*
-// @version     1.1
+// @include     https://accounts.google.com/ServiceLoginAuth#*
+// @version     1.2
 // @grant       none
 // ==/UserScript==
 
@@ -29,6 +31,7 @@ Changelog:
 - v1.1 Expanded @includes to initial screen, repointed form to third
   URL (I think I had been testing the initial version on the third
   URL, masking the issue)
+- v1.2 Added @include variants with fragment wildcards
 
 */
 
