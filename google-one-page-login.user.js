@@ -8,7 +8,7 @@
 // @include     https://accounts.google.com/ServiceLoginAuth
 // @include     https://accounts.google.com/ServiceLoginAuth?*
 // @include     https://accounts.google.com/ServiceLoginAuth#*
-// @version     1.2
+// @version     1.3
 // @grant       none
 // ==/UserScript==
 
@@ -32,10 +32,15 @@ Changelog:
   URL (I think I had been testing the initial version on the third
   URL, masking the issue)
 - v1.2 Added @include variants with fragment wildcards
-
+- v1.3 Remove event listeners on form to sidestep XHR flow
 */
 
-var form = document.getElementById('gaia_loginform');
+// Replace form with deep clone in order to shake off the event listeners
+var origForm = document.getElementById('gaia_loginform');
+var form = origForm.cloneNode(true);
+origForm.parentNode.appendChild(form, origForm);
+origForm.parentNode.removeChild(origForm);
+
 var formAction = form.getAttribute('action');
 var actionBetter = formAction.replace('/AccountLoginInfo', '/ServiceLoginAuth');
 form.setAttribute('action', actionBetter);
