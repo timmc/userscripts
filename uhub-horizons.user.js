@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            UHub Horizons
 // @namespace       tag:brainonfire.net,2021-11-11:uhub-horizons
-// @version         1.0.1
+// @version         1.0.2
 // @description     Block comments by some authors, and responses to those comments. This is inspired by the Chrome extension <https://github.com/balsama/nomagoo>.
 // @include         https://www.universalhub.com/*
 // @author          Tim McCormack
@@ -36,8 +36,6 @@ var hideAnonymousComments = false;
 
 
 function doHiding() {
-    var $ = unsafeWindow.jQuery;
-
     function hideOneComment(commentNode) {
         // Hide the comment itself
         $(commentNode).hide();
@@ -61,6 +59,8 @@ function doHiding() {
         console.log(`Hid ${foundAnonComments.size()} anonymous comments`);
     }
 
+    var $ = unsafeWindow.jQuery;
+
     blockedUsernames.forEach(hideAllFromUsername);
 
     if (hideAnonymousComments) {
@@ -77,3 +77,5 @@ window.addEventListener('load', doHiding, false);
 // - 1.0.0: Original.
 // - 1.0.1: Replace @match with @include and remove include-star
 //   (was activating other places, I think.)
+// - 1.0.2: Move $ declaration below functions to satisfy Chrome
+//   (although it still worked, despite the console error...)
