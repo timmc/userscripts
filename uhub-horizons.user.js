@@ -1,11 +1,10 @@
 // ==UserScript==
 // @name            UHub Horizons
 // @namespace       tag:brainonfire.net,2021-11-11:uhub-horizons
-// @version         1.0.0
+// @version         1.0.1
 // @description     Block comments by some authors, and responses to those comments. This is inspired by the Chrome extension <https://github.com/balsama/nomagoo>.
-// @include         *
+// @include         https://www.universalhub.com/*
 // @author          Tim McCormack
-// @match           https://www.universalhub.com/*
 // @run-at          document-idle
 // @grant           unsafeWindow
 // ==/UserScript==
@@ -71,3 +70,10 @@ function doHiding() {
 
 // Don't run until jQuery and other things are loaded.
 window.addEventListener('load', doHiding, false);
+
+
+//==== Changelog ====//
+
+// - 1.0.0: Original.
+// - 1.0.1: Replace @match with @include and remove include-star
+//   (was activating other places, I think.)
