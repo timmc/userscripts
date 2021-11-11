@@ -2,7 +2,7 @@
 // @name            UHub Horizons
 // @namespace       tag:brainonfire.net,2021-11-11:uhub-horizons
 // @version         1.0.0
-// @description     Block comments by some authors, and responses to those comments.
+// @description     Block comments by some authors, and responses to those comments. This is inspired by the Chrome extension <https://github.com/balsama/nomagoo>.
 // @include         *
 // @author          Tim McCormack
 // @match           https://www.universalhub.com/*
