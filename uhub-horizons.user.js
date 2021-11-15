@@ -1,9 +1,10 @@
 // ==UserScript==
 // @name            UHub Horizons
 // @namespace       tag:brainonfire.net,2021-11-11:uhub-horizons
-// @version         1.0.2
+// @version         1.1.0
 // @description     Block comments by some authors, and responses to those comments. This is inspired by the Chrome extension <https://github.com/balsama/nomagoo>.
-// @include         https://www.universalhub.com/*
+// @include         *://universalhub.com/*
+// @include         *://www.universalhub.com/*
 // @author          Tim McCormack
 // @run-at          document-idle
 // @grant           unsafeWindow
@@ -34,8 +35,9 @@ var hideAnonymousComments = false;
 
 //==== Code ====//
 
+function doHiding(event) {
+    if (event.target != window) return;
 
-function doHiding() {
     function hideOneComment(commentNode) {
         // Hide the comment itself
         $(commentNode).hide();
@@ -49,17 +51,26 @@ function doHiding() {
         // Go back up to the containing class="comment" block and hide it.
         foundAuthorLinks.closest('.comment').each((i, el) => hideOneComment(el));
         // Log what happened.
-        console.log(`Hid ${foundAuthorLinks.size()} comments by ${username}`);
+        $log.append(`Hid ${foundAuthorLinks.size()} comments by ${username}\n`);
     }
 
     function hideAllFromAnonymous() {
         var foundAnonComments = $('.comment-by-anonymous');
         foundAnonComments.each((i, el) => hideOneComment(el));
         // Log what happened.
-        console.log(`Hid ${foundAnonComments.size()} anonymous comments`);
+        $log.append(`Hid ${foundAnonComments.size()} anonymous comments\n`);
     }
 
     var $ = unsafeWindow.jQuery;
+    $('#comments').append(`
+    <details>
+      <summary style="display: list-item">
+        UHub Horizons output
+        [<a href="https://github.com/timmc/userscripts/blob/master/uhub-horizons.user.js">src</a>]
+      </summary>
+      <pre id="horizons-log"></pre>
+    </details>`);
+    var $log = $('#horizons-log');
 
     blockedUsernames.forEach(hideAllFromUsername);
 
@@ -69,7 +80,7 @@ function doHiding() {
 }
 
 // Don't run until jQuery and other things are loaded.
-window.addEventListener('load', doHiding, false);
+window.addEventListener('load', doHiding);
 
 
 //==== Changelog ====//
@@ -79,3 +90,9 @@ window.addEventListener('load', doHiding, false);
 //   (was activating other places, I think.)
 // - 1.0.2: Move $ declaration below functions to satisfy Chrome
 //   (although it still worked, despite the console error...)
+// - 1.1.0:
+//   - Move logging to a collapsed element at the end of the comments block
+//   - Expand inclusions to with/without www subdomain, http or https
+//   - Drop unnecessary useCapture=false
+//   - Restrict to window load event, not bubbled-up document load event that
+//     Chromium does. (And restore var scope.)
