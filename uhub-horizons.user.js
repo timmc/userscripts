@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name            UHub Horizons
 // @namespace       tag:brainonfire.net,2021-11-11:uhub-horizons
-// @version         1.1.0
+// @version         1.1.1
 // @description     Block comments by some authors, and responses to those comments. This is inspired by the Chrome extension <https://github.com/balsama/nomagoo>.
 // @include         *://universalhub.com/*
 // @include         *://www.universalhub.com/*
 // @author          Tim McCormack
-// @run-at          document-idle
+// @run-at          document-start
 // @grant           unsafeWindow
 // ==/UserScript==
 
@@ -96,3 +96,5 @@ window.addEventListener('load', doHiding);
 //   - Drop unnecessary useCapture=false
 //   - Restrict to window load event, not bubbled-up document load event that
 //     Chromium does. (And restore var scope.)
+// - 1.1.1: Finally fixed the bug where the script wouldn't activate
+//   when a link was opened in a new, background tab.
