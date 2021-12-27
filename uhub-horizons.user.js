@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            UHub Horizons
 // @namespace       tag:brainonfire.net,2021-11-11:uhub-horizons
-// @version         1.1.1
+// @version         1.1.2
 // @description     Block comments by some authors, and responses to those comments. This is inspired by the Chrome extension <https://github.com/balsama/nomagoo>.
 // @include         *://universalhub.com/*
 // @include         *://www.universalhub.com/*
@@ -42,7 +42,7 @@ function doHiding(event) {
         // Hide the comment itself
         $(commentNode).hide();
         // And hide the <div class="indented"> that follows it, which contains all the replies (and their replies, etc.)
-        $(commentNode).nextAll('.indented').first().hide();
+        $(commentNode).nextUntil('.comment', '.indented').first().hide();
     }
 
     function hideAllFromUsername(username) {
@@ -98,3 +98,5 @@ window.addEventListener('load', doHiding);
 //     Chromium does. (And restore var scope.)
 // - 1.1.1: Finally fixed the bug where the script wouldn't activate
 //   when a link was opened in a new, background tab.
+// - 1.1.2: Fix a bug where if a hidden comment didn't have replies, the
+//   next set of replies in the comment tree was hidden instead.
