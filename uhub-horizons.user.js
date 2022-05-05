@@ -1,10 +1,9 @@
 // ==UserScript==
 // @name            UHub Horizons
 // @namespace       tag:brainonfire.net,2021-11-11:uhub-horizons
-// @version         1.1.2
+// @version         1.1.3
 // @description     Block comments by some authors, and responses to those comments. This is inspired by the Chrome extension <https://github.com/balsama/nomagoo>.
-// @include         *://universalhub.com/*
-// @include         *://www.universalhub.com/*
+// @match           http*://*.universalhub.com/*
 // @author          Tim McCormack
 // @run-at          document-start
 // @grant           unsafeWindow
@@ -100,3 +99,5 @@ window.addEventListener('load', doHiding);
 //   when a link was opened in a new, background tab.
 // - 1.1.2: Fix a bug where if a hidden comment didn't have replies, the
 //   next set of replies in the comment tree was hidden instead.
+// - 1.1.3: Switch from @include back to @match -- working better now,
+//   I guess.
