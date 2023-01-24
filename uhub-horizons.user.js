@@ -23,8 +23,14 @@
 var blockedUsernames = [
     // "MisterMagooForYou": Has a really annoying shtick
     'mistermagooforyou',
-    // "Notfromboston": General troll or shit-stirrer
-    'notfromboston',
+    // General trolls or shit-stirrers
+    'notfromboston', // "Notfromboston"
+    'rwgfy', // "Rwgfy"
+    'bostonperson', // "Bostonperson"
+    // "SwirlyGrrl": Sometimes informative, but picks a lot of fights
+    'swirlygrrl',
+    // "John Costello": Picks fights
+    'john-costello',
 ];
 
 // Sometimes there are actually good comments by unregistered users,
